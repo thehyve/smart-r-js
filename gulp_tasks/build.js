@@ -17,12 +17,12 @@ gulp.task('compact', compact);
 function unify() {
     return gulp.src(conf.path.tmp('**/*.js'))
         .pipe(ngAnnotate())
-        .pipe(concat('my-module.js'))
+        .pipe(concat('smart-r-js.js'))
         .pipe(gulp.dest(conf.path.dist()));
 }
 
 function compact() {
-    return gulp.src(conf.path.dist('my-module.js'))
+    return gulp.src(conf.path.dist('smart-r-js.js'))
         .pipe(uglify())
         .pipe(rename({extname: '.min.js' }))
         .pipe(gulp.dest(conf.path.dist()));
