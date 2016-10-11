@@ -1,4 +1,4 @@
-### SmartR JS 
+# SmartR JS 
 
 SmartR-JS is an Angular JS plugin version of SmartR (https://github.com/transmart/SmartR) which currently works well with transmart-base-ui (https://github.com/thehyve/transmart-base-ui). 
 
