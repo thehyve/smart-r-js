@@ -34,5 +34,10 @@
     "bower_components",
     "test",
     "tests"
-  ]
+  ],
+  "resolutions": {
+    "jquery": "~2.2",
+    "angular": "1.5.8",
+    "d3": "~3.5.17"
+  }
 }
