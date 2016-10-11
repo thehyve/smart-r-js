@@ -12,7 +12,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 height: '@',
                 params: '='
             },
-            templateUrl:   'app/SmartR/containers/templates/heatmap.html',
+            templateUrl:   'src/containers/templates/heatmap.html',
             link: function(scope, element) {
 
                 var viz = element.children()[1];

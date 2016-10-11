@@ -31,7 +31,7 @@ angular.module('smartRApp').directive('summaryStats',
                     }
                 });
             },
-            templateUrl:   'app/SmartR/containers/templates/summaryStatistics.html'
+            templateUrl:   'src/containers/templates/summaryStatistics.html'
         };
     }
 ]);

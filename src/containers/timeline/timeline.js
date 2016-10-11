@@ -6,10 +6,10 @@ angular.module('smartRApp')
                 url: '/timeline',
                 views: {
                     '@': {
-                        templateUrl: 'app/SmartR/containers/timeline/timeline.html'
+                        templateUrl: 'src/containers/timeline/timeline.html'
                     },
                     'content@timeline': {
-                        templateUrl: 'app/SmartR/containers/timeline/timeline.content.html'
+                        templateUrl: 'src/containers/timeline/timeline.content.html'
                     },
                     'sidebar@timeline': {
                         templateUrl: 'app/components/sidebar/sidebar.html',

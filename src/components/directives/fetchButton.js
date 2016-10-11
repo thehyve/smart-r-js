@@ -21,7 +21,7 @@ angular.module('smartRApp').directive('fetchButton', [
                 allowedCohorts: '=',
                 projection: '@?'
             },
-            templateUrl: 'app/SmartR/containers/templates/fetchButton.html',
+            templateUrl: 'src/containers/templates/fetchButton.html',
             link: function(scope, element) {
                 var template_btn = element.children()[0],
                     template_msg = element.children()[1];

@@ -6,10 +6,10 @@ angular.module('smartRApp')
                 url: '/heatmap',
                 views: {
                     '@': {
-                        templateUrl: 'app/SmartR/containers/heatmap/heatmap.html'
+                        templateUrl: 'src/containers/heatmap/heatmap.html'
                     },
                     'content@heatmap': {
-                        templateUrl: 'app/SmartR/containers/heatmap/heatmap.content.html'
+                        templateUrl: 'src/containers/heatmap/heatmap.content.html'
                     },
                     'sidebar@heatmap': {
                         templateUrl: 'app/components/sidebar/sidebar.html',

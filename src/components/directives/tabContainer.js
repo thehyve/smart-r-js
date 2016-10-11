@@ -7,7 +7,7 @@ angular.module('smartRApp').directive('tabContainer',
         return {
             restrict: 'E',
             transclude: true,
-            templateUrl:  'app/SmartR/containers/templates/tabContainer.html',
+            templateUrl:  'src/containers/templates/tabContainer.html',
             controller: function($scope) {
                 $scope.tabs = [];
                 this.addTab = function(tab) {

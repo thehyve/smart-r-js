@@ -12,7 +12,7 @@ angular.module('smartRApp').directive('sortingCriteria', [
                 samples: '=',
                 subsets: '='
             },
-            templateUrl:   'app/SmartR/containers/templates/sortingCriteria.html'
+            templateUrl:   'src/containers/templates/sortingCriteria.html'
         };
     }
 ]);

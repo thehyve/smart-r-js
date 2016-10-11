@@ -17,7 +17,7 @@ angular.module('smartRApp').directive('conceptBox', [
                 max: '@',
                 type: '@'
             },
-            templateUrl: 'app/SmartR/containers/templates/conceptBox.html',
+            templateUrl: 'src/containers/templates/conceptBox.html',
             link: function (scope, element) {
                 var max = parseInt(scope.max);
                 var min = parseInt(scope.min);

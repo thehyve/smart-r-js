@@ -10,7 +10,7 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
         scope: {
             biomarkers: '='
         },
-        templateUrl:  'app/SmartR/containers/templates/biomarkerSelection.html',
+        templateUrl:  'src/containers/templates/biomarkerSelection.html',
         controller: function ($scope) {
             if (!$scope.biomarkers) {
                 $scope.biomarkers = [];

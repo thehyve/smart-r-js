@@ -17,7 +17,7 @@ angular.module('smartRApp').directive('runButton', [
                 filename: '@?',
                 params: '=?argumentsToUse'
             },
-            templateUrl:  'app/SmartR/containers/templates/runButton.html',
+            templateUrl:  'src/containers/templates/runButton.html',
             link: function(scope, element) {
                 var params = scope.params ? scope.params : {};
 

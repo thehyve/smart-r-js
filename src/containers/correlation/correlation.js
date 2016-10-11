@@ -6,10 +6,10 @@ angular.module('smartRApp')
                 url: '/correlation',
                 views: {
                     '@': {
-                        templateUrl: 'app/SmartR/containers/correlation/correlation.html'
+                        templateUrl: 'src/containers/correlation/correlation.html'
                     },
                     'content@correlation': {
-                        templateUrl: 'app/SmartR/containers/correlation/correlation.content.html'
+                        templateUrl: 'src/containers/correlation/correlation.content.html'
                     },
                     'sidebar@correlation': {
                         templateUrl: 'app/components/sidebar/sidebar.html',

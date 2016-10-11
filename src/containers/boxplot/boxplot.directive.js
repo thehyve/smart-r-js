@@ -11,7 +11,7 @@ angular.module('smartRApp').directive('boxplot', [
                 width: '@',
                 height: '@'
             },
-            templateUrl:  'app/SmartR/containers/templates/boxplot.html',
+            templateUrl:  'src/containers/templates/boxplot.html',
             link: function (scope, element) {
                 var template_ctrl = element.children()[0],
                     template_viz = element.children()[1];

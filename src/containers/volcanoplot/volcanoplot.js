@@ -6,10 +6,10 @@ angular.module('smartRApp')
                 url: '/volcanoplot',
                 views: {
                     '@': {
-                        templateUrl: 'app/SmartR/containers/volcanoplot/volcanoplot.html'
+                        templateUrl: 'src/containers/volcanoplot/volcanoplot.html'
                     },
                     'content@volcanoplot': {
-                        templateUrl: 'app/SmartR/containers/volcanoplot/volcanoplot.content.html'
+                        templateUrl: 'src/containers/volcanoplot/volcanoplot.content.html'
                     },
                     'sidebar@volcanoplot': {
                         templateUrl: 'app/components/sidebar/sidebar.html',

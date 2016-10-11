@@ -6,10 +6,10 @@ angular.module('smartRApp')
                 url: '/boxplot',
                 views: {
                     '@': {
-                        templateUrl: 'app/SmartR/containers/boxplot/boxplot.html'
+                        templateUrl: 'src/containers/boxplot/boxplot.html'
                     },
                     'content@boxplot': {
-                        templateUrl: 'app/SmartR/containers/boxplot/boxplot.content.html',
+                        templateUrl: 'src/containers/boxplot/boxplot.content.html',
                         controller: 'BoxplotController',
                         controllerAs: 'vm'
                     },

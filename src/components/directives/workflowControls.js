@@ -8,7 +8,7 @@ angular.module('smartRApp').directive('workflowControls', [
         return {
             restrict: 'E',
             transclude: true,
-            templateUrl:  'app/SmartR/containers/templates/workflowControls.html'
+            templateUrl:  'src/containers/templates/workflowControls.html'
         };
     }
 ]);
