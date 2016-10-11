@@ -32,6 +32,7 @@
     "gulp": "gulpjs/gulp#4ed9a4a3275559c73a396eff7e1fde3824951ebb",
     "gulp-angular-templatecache": "^2.0.0",
     "gulp-concat": "^2.6.0",
+    "gulp-cssnano": "^2.1.2",
     "gulp-eslint": "^3.0.1",
     "gulp-htmlmin": "^2.0.0",
     "gulp-hub": "frankwallis/gulp-hub#d461b9c700df9010d0a8694e4af1fb96d9f38bf4",
@@ -65,5 +66,8 @@
     "extends": [
       "xo-space"
     ]
+  },
+  "dependencies": {
+    "gulp-less": "^3.1.0"
   }
 }

@@ -16,7 +16,7 @@
 const path = require('path');
 const gutil = require('gulp-util');
 
-exports.ngModule = 'ts.my-module';
+exports.ngModule = 'smartRApp';
 
 /**
  *  The main paths of your project handle these with care
