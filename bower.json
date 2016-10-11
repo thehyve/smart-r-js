@@ -12,7 +12,10 @@
   },
   "homepage": "https://github.com/thehyve/smart-r-js",
   "description": "Angular JS plugin skeleton for a transmart UI.",
-  "main": "dist/smart-r-js.js",
+  "main": [
+    "dist/smart-r-js.js",
+    "dist/smart-r-js.css"
+  ],
   "keywords": [
     "transmart",
     "plugin",
