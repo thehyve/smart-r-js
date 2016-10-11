@@ -11,7 +11,7 @@
     "angular-mocks": "^1.5.8"
   },
   "homepage": "https://github.com/thehyve/smart-r-js",
-  "description": "Angular JS plugin skeleton for a transmart UI.",
+  "description": "SmartR JS angular plugin for a transmart UI.",
   "main": [
     "dist/smart-r-js.js",
     "dist/smart-r-js.css"
