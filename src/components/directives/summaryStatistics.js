@@ -1,8 +1,6 @@
-//# sourceURL=summaryStatistics.js
-
 'use strict';
 
-angular.module('smartRApp').directive('summaryStats',
+angular.module('smartRApp').directive(['summaryStats',
     '$rootScope',
     function($rootScope) {
         return {
