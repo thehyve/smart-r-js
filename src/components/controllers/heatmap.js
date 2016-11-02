@@ -23,8 +23,7 @@ angular.module('smartRApp').controller('HeatmapController', [
                 categoric: {concepts: [], valid: true}
             },
             selectedBiomarkers: [],
-            scriptResults: {},
-            images: {}
+            scriptResults: {}
         };
 
         // ------------------------------------------------------------- //
@@ -46,6 +45,9 @@ angular.module('smartRApp').controller('HeatmapController', [
             disabled: true,
             running: false,
             params: {
+                selections: {
+                    selectedRownames: [],
+                },
                 max_row: 100,
                 sorting: 'nodes',
                 ranking: 'coef',

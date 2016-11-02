@@ -19,7 +19,8 @@ angular.module('smartRApp').directive('fetchButton', [
                 allSamples: '=?',
                 numberOfRows: '=?',
                 allowedCohorts: '=',
-                projection: '@?'
+                projection: '@?',
+                hasPreprocessTab: '=?'
             },
             templateUrl: 'src/containers/templates/fetchButton.html',
             link: function(scope, element) {
@@ -27,7 +28,11 @@ angular.module('smartRApp').directive('fetchButton', [
                     template_msg = element.children()[1];
 
                 var _onSuccess = function() {
-                    template_msg.innerHTML = 'Task complete! Go to the "Preprocess" or "Run Analysis" tab to continue.';
+                    if (scope.hasPreprocessTab) {
+                        template_msg.innerHTML = 'Task complete! Go to the "Preprocess" or "Run Analysis" tab to continue.';
+                    } else {
+                        template_msg.innerHTML = 'Task complete! Go to the "Run Analysis" tab to continue.';
+                    }
                     scope.loaded = true;
                     template_btn.disabled = false;
                     scope.running = false;

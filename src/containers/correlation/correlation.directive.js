@@ -131,8 +131,8 @@ angular.module('smartRApp').directive('correlationPlot', [
                 .on('contextmenu', function() {
                     d3.event.preventDefault();
                     contextMenu.show('<input id="sr-correlation-zoom-btn" value="Zoom" class="sr-ctx-menu-btn"><br/>' +
-                        '<input id="sr-correlation-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
-                        '<input id="sr-correlation-reset-btn" value="Reset" class="sr-ctx-menu-btn">');
+                                     '<input id="sr-correlation-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
+                                     '<input id="sr-correlation-reset-btn" value="Reset" class="sr-ctx-menu-btn">');
                     _addEventListeners();
                 });
 

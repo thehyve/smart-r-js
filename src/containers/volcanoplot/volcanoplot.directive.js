@@ -12,8 +12,8 @@ angular.module('smartRApp').directive('volcanoPlot', [
             link: function (scope, element) {
 
                 /**
-                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
-                 */
+            * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
+            */
                 scope.$watch('data', function() {
                     $(element[0]).empty();
                     if (!$.isEmptyObject(scope.data)) {
@@ -60,8 +60,10 @@ angular.module('smartRApp').directive('volcanoPlot', [
 
             volcanoplot.call(tip);
 
+            var maxAbsLogFCs = Math.max.apply(null, logFCs.map(Math.abs))
+
             var x = d3.scale.linear()
-                .domain([-Math.max.apply(null, logFCs), Math.max.apply(null, logFCs)])
+                .domain([-maxAbsLogFCs, maxAbsLogFCs])
                 .range([0, width]);
 
             var y = d3.scale.linear()
@@ -89,21 +91,21 @@ angular.module('smartRApp').directive('volcanoPlot', [
                 .attr('class', 'x axis')
                 .attr('transform', 'translate(0, 0)')
                 .call(d3.svg.axis()
-                    .scale(x)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(height)
-                    .orient('bottom'));
+                .scale(x)
+                .ticks(10)
+                .tickFormat('')
+                .innerTickSize(height)
+                .orient('bottom'));
 
             volcanoplot.append('g')
                 .attr('class', 'y axis')
                 .attr('transform', 'translate(' + width + ',' + 0 + ')')
                 .call(d3.svg.axis()
-                    .scale(y)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(width)
-                    .orient('left'));
+                .scale(y)
+                .ticks(10)
+                .tickFormat('')
+                .innerTickSize(width)
+                .orient('left'));
 
             volcanoplot.append('text')
                 .attr('class', 'text axisText')
@@ -145,7 +147,7 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return getColor(d);
                     });
 
-                drawVolcanotable(getTopRankedPoints().data());
+                    drawVolcanotable(getTopRankedPoints().data());
             }
 
             var pDrag = d3.behavior.drag()
@@ -213,7 +215,7 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return getColor(d);
                     });
 
-                drawVolcanotable(getTopRankedPoints().data());
+                    drawVolcanotable(getTopRankedPoints().data());
             }
 
             var lFCDrag = d3.behavior.drag()
@@ -313,24 +315,24 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return d;
                     });
 
-                var rows = tbody.selectAll('tr')
-                    .data(points)
-                    .enter()
-                    .append('tr')
-                    .attr('class', 'mytr');
+                    var rows = tbody.selectAll('tr')
+                        .data(points)
+                        .enter()
+                        .append('tr')
+                        .attr('class', 'mytr');
 
-                rows.selectAll('td')
-                    .data(function (row) {
-                        return columns.map(function (column) {
-                            return {column: column, value: row[column]};
+                    rows.selectAll('td')
+                        .data(function (row) {
+                            return columns.map(function (column) {
+                                return {column: column, value: row[column]};
+                            });
+                        })
+                        .enter()
+                        .append('td')
+                        .attr('class', 'text mytd')
+                        .text(function (d) {
+                            return d.value;
                         });
-                    })
-                    .enter()
-                    .append('td')
-                    .attr('class', 'text mytd')
-                    .text(function (d) {
-                        return d.value;
-                    });
             }
 
             function updateVolcano() {
@@ -339,34 +341,34 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return d.uid;
                     });
 
-                point.enter()
-                    .append('rect')
-                    .attr('class', function(d) { return 'point uid-' + smartRUtils.makeSafeForCSS(d.uid); })
-                    .attr('x', function (d) {
-                        return x(d.logFC) - 2;
-                    })
-                    .attr('y', function (d) {
-                        return y(d.negativeLog10PValues) - 2;
-                    })
-                    .attr('width', 4)
-                    .attr('height', 4)
-                    .style('fill', function (d) {
-                        return getColor(d);
-                    })
-                    .on('mouseover', function (d) {
-                        var html = 'ID: ' + d.uid + '<br/>' +
-                            'p-value: ' + d.pValue + '<br/>' +
-                            '-log10 p: ' + d.negativeLog10PValues + '<br/>' +
-                            'log2FC: ' + d.logFC;
-                        tip.show(html);
-                    })
-                    .on('mouseout', function () {
-                        tip.hide();
-                    });
+                    point.enter()
+                        .append('rect')
+                        .attr('class', function(d) { return 'point uid-' + smartRUtils.makeSafeForCSS(d.uid); })
+                        .attr('x', function (d) {
+                            return x(d.logFC) - 2;
+                        })
+                        .attr('y', function (d) {
+                            return y(d.negativeLog10PValues) - 2;
+                        })
+                        .attr('width', 4)
+                        .attr('height', 4)
+                        .style('fill', function (d) {
+                            return getColor(d);
+                        })
+                        .on('mouseover', function (d) {
+                            var html = 'ID: ' + d.uid + '<br/>' +
+                                'p-value: ' + d.pValue + '<br/>' +
+                                '-log10 p: ' + d.negativeLog10PValues + '<br/>' +
+                                'log2FC: ' + d.logFC;
+                            tip.show(html);
+                        })
+                        .on('mouseout', function () {
+                            tip.hide();
+                        });
 
-                point.exit()
-                    .attr('r', 0)
-                    .remove();
+                        point.exit()
+                            .attr('r', 0)
+                            .remove();
             }
 
             updateVolcano();

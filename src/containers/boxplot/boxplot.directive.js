@@ -166,22 +166,23 @@ angular.module('smartRApp').directive('boxplot', [
                 _addEventListeners();
             });
 
-            var currentSelection;
-            function updateSelection() {
-                d3.selectAll('.point').classed('brushed', false);
-                var extent = brush.extent();
-                var left = extent[0][0],
-                    top = extent[0][1],
-                    right = extent[1][0],
-                    bottom = extent[1][1];
-                currentSelection = d3.selectAll('.point')
-                    .filter(function (d) {
-                        var point = d3.select(this);
-                        return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
-                    })
-                    .classed('brushed', true)
-                    .map(function(d) { return d.patientID; });
-            }
+        var currentSelection;
+        function updateSelection() {
+            d3.selectAll('.point').classed('brushed', false);
+            var extent = brush.extent();
+            var left = extent[0][0],
+                top = extent[0][1],
+                right = extent[1][0],
+                bottom = extent[1][1];
+            currentSelection = d3.selectAll('.point')
+                .filter(function (d) {
+                    var point = d3.select(this);
+                    return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
+                })
+                .classed('brushed', true)
+                .data()
+                .map(function(d) { return d.patientID; });
+        }
 
             function excludeSelection() {
                 excludedPatientIDs = excludedPatientIDs.concat(currentSelection);
@@ -206,10 +207,10 @@ angular.module('smartRApp').directive('boxplot', [
                 d3.selectAll('.d3-tip').remove();
             }
 
-            function removeOutliers() {
-                currentSelection = d3.selectAll('.outlier').map(function (d) { return d.patientID; });
-                if (currentSelection) { excludeSelection(); }
-            }
+        function removeOutliers() {
+            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
+            if (currentSelection) { excludeSelection(); }
+        }
 
             function kernelDensityEstimator(kernel, x) {
                 return function (sample) {

@@ -38,7 +38,6 @@ angular.module('smartRApp').directive('heatmapPlot', [
             var extraFields = scope.data.extraFields;
             var features = scope.data.features.constructor === Array ? scope.data.features : [];
 
-            var patientIDs = scope.data.patientIDs.map(function(d) { return parseInt(d); });
             var colNames = scope.data.colNames; // unique
             var rowNames = scope.data.rowNames; // unique
 
@@ -70,7 +69,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
             var legendHeight = 40;
 
             var margin = {
-                top: gridFieldHeight * 2 + features.length * gridFieldHeight + dendrogramHeight + 100,
+                top: gridFieldHeight * 2 + longestColNameLength +  features.length * gridFieldHeight + dendrogramHeight + 100,
                 right: gridFieldWidth + 300 + dendrogramHeight,
                 bottom: 10,
                 left: histogramHeight
@@ -95,13 +94,27 @@ angular.module('smartRApp').directive('heatmapPlot', [
             zoomRange.addEventListener('mouseup', function() { zoom(parseInt(zoomRange.value)); });
             zoomRange.value = 100;
 
+            var setCutoffBtnText = function() {
+                if (parseInt(cutoffRange.value) === 0) {
+                    cutoffBtn.value = 'Reset Cutoff';
+                } else {
+                    cutoffBtn.value = 'Apply Cutoff';
+                }
+            };
+
             var cutoffBtn = smartRUtils.getElementWithoutEventListeners('sr-heatmap-cutoff-btn');
             cutoffBtn.addEventListener('click', cutoff);
 
             var cutoffRange = smartRUtils.getElementWithoutEventListeners('sr-heatmap-cutoff-range');
-            cutoffRange.addEventListener('mouseup', function() { animateCutoff(parseInt(cutoffRange.value)); });
-            cutoffRange.setAttribute('max', maxRows);
+            cutoffRange.addEventListener('input', function() {
+                animateCutoff(parseInt(cutoffRange.value));
+                setCutoffBtnText();
+            });
+            cutoffRange.setAttribute('max', maxRows - JSON.parse(JSON.stringify(scope.params.selections.selectedRownames)).length - 1);
             cutoffRange.value = 0;
+            cutoffRange.disabled = parseInt(cutoffRange.max) <= 1;
+            
+            setCutoffBtnText();
 
             var clusterSelect = smartRUtils.getElementWithoutEventListeners('sr-heatmap-cluster-select');
             clusterSelect.addEventListener('change', function() { cluster(clusterSelect.value); });
@@ -153,6 +166,9 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     case 'PVAL':
                     case 'ADJPVAL':
                         return 1 - value;
+                    case 'TTEST':
+                    case 'LOGFOLD':
+                        return Math.abs(value);
                     default:
                         return value;
                 }
@@ -263,12 +279,16 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 function getValueForSquareSorting(colName, rowName) {
                     var square = d3.select('.square' + '.colname-' + smartRUtils.makeSafeForCSS(colName) +
                         '.rowname-' + smartRUtils.makeSafeForCSS(rowName));
-                    return square[0][0] ? square.property('__data__').ZSCORE : Number.NEGATIVE_INFINITY;
+                    return square[0][0] ? square.property('__data__').ZSCORE : (-Math.pow(2, 32)).toString();
                 }
 
                 function isSorted(arr) {
                     return arr.every(function(d, i) {
-                        return i === arr.length - 1 || arr[i][1] >= arr[i + 1][1];
+                        if (i === arr.length - 1) {
+                            return true;
+                        } 
+                        var diff = arr[i][1] - arr[i + 1][1];
+                        return isNaN(diff) ? (arr[i][1].localeCompare(arr[i + 1][1]) <= 0) : diff >= 0;
                     });
                 }
 
@@ -390,8 +410,8 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .on('click', function() {
                         var rowValues = statistics.map(function(d) { return d[ranking]; })
                             .map(function(significanceValue, idx) {
-                                return [idx, getInternalSortValue(significanceValue)];
-                            });
+                            return [idx, getInternalSortValue(significanceValue)];
+                        });
 
                         if (isSorted(rowValues)) {
                             rowValues.sort(function(a, b) { return a[1] - b[1]; });
@@ -454,24 +474,21 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('height', gridFieldHeight);
 
                 var colName = colNameItems.selectAll('.colname')
-                    .data(colNames.map(function(colName, i) {
-                        return { colName: colName, patientID: patientIDs[i] };
-                    }), function(d) { return d.colName; });
+                    .data(colNames, function(d) { return d; });
 
                 colName.enter()
                     .append('text')
                     .attr('class', function(d) {
-                        return 'colname colname-' + smartRUtils.makeSafeForCSS(d.colName) +
-                            ' patientID-' + smartRUtils.makeSafeForCSS(d.patientID);
+                        return 'colname colname-' + smartRUtils.makeSafeForCSS(d);
                     })
                     .style('text-anchor', 'start')
-                    .text(function(d) { return d.colName; });
+                    .text(function(d) { return d; });
 
                 colName.transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
                     .style('font-size', gridFieldHeight + 'px')
                     .attr('transform', function(d) {
-                        return 'translate(' + (colNames.indexOf(d.colName) * gridFieldWidth) + ',0)' +
+                        return 'translate(' + (colNames.indexOf(d) * gridFieldWidth) + ',0)' +
                             'translate(' + (gridFieldWidth / 2) + ',' + (-4 - gridFieldHeight * 2) + ')rotate(-45)';
                     });
 
@@ -509,7 +526,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('y', function(d) { return rowNames.indexOf(d) * gridFieldHeight + 0.5 * gridFieldHeight; });
 
                 var bar = barItems.selectAll('.bar')
-                    .data(statistics, function(d, i) { return i; });
+                    .data(statistics, function(d) { return d.ROWNAME; });
 
                 bar.enter()
                     .append('rect')
@@ -537,8 +554,8 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
                     .attr('width', function(d) { return histogramScale(d[ranking]); })
                     .attr('height', gridFieldHeight)
-                    .attr('x', function(d) { return -histogramScale(d[ranking]); })
                     .attr('y', function(d) { return gridFieldHeight * rowNames.indexOf(d.ROWNAME); })
+                    .attr('x', function(d) { return -histogramScale(d[ranking]); })
                     .style('fill', function(d) { return d[ranking] > 0 ? '#990000' : 'steelblue'; });
 
                 var featurePosY = -gridFieldWidth * 2 - longestColNameLength + 20;
@@ -549,15 +566,14 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 extraSquare.enter()
                     .append('rect')
                     .attr('class', function(d) {
-                        return 'extraSquare patientID-' + smartRUtils.makeSafeForCSS(d.PATIENTID) +
+                        return 'extraSquare colname-' + smartRUtils.makeSafeForCSS(d.COLNAME) +
                             ' rowname-' + smartRUtils.makeSafeForCSS(d.ROWNAME);
                     })
                     .on('mouseover', function(d) {
-                        d3.select('.colname.patientID-' + smartRUtils.makeSafeForCSS(d.PATIENTID)).classed('highlight', true);
+                        d3.select('.colname.colname-' + smartRUtils.makeSafeForCSS(d.COLNAME)).classed('highlight', true);
                         d3.select('.feature.feature-' + smartRUtils.makeSafeForCSS(d.ROWNAME)).classed('highlight', true);
                         var html = 'Value: ' + d.VALUE + '<br/>' +
                             (d.ZSCORE ? 'z-Score: ' + d.ZSCORE + '<br/>' : '') +
-                            'Column: ' + d.COLNAME + '<br/>' +
                             'Row: ' + d.ROWNAME + '<br/>' +
                             'PatientId: ' + d.PATIENTID + '<br/>' +
                             'Type: ' + d.TYPE + '<br/>' +
@@ -573,7 +589,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
 
                 extraSquare.transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
-                    .attr('x', function(d) { return patientIDs.indexOf(d.PATIENTID) * gridFieldWidth; })
+                    .attr('x', function(d) { return colNames.indexOf(d.COLNAME) * gridFieldWidth; })
                     .attr('y', function(d) { return featurePosY - features.indexOf(d.ROWNAME) * gridFieldHeight; })
                     .attr('width', gridFieldWidth)
                     .attr('height', gridFieldHeight);
@@ -586,9 +602,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('class', function(d) { return 'feature feature-' + smartRUtils.makeSafeForCSS(d); })
                     .attr('dy', '0.35em')
                     .style('text-anchor', 'start')
-                    .text(function(d) {
-                        return d === 'Cohort' ? d : smartRUtils.shortenConcept(d);
-                    });
+                    .text(function(d) { return d; });
 
                 feature.transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
@@ -621,9 +635,9 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .append('rect')
                     .attr('class', 'box featureSortBox')
                     .on('click', function(feature) {
-                        var featureValues = patientIDs.map(function(patientID, idx) {
+                        var featureValues = colNames.map(function(colName, idx) {
                             var css = 'extraSquare rowname-' + smartRUtils.makeSafeForCSS(feature) +
-                                ' patientID-' + smartRUtils.makeSafeForCSS(patientID);
+                                ' colname-' + smartRUtils.makeSafeForCSS(colName);
                             var elements = document.getElementsByClassName(css);
                             var value = (-Math.pow(2, 32)).toString(); // if square does not exist
                             if (elements.length > 0) {
@@ -635,12 +649,12 @@ angular.module('smartRApp').directive('heatmapPlot', [
                         if (isSorted(featureValues)) {
                             featureValues.sort(function(a, b) {
                                 var diff = a[1] - b[1];
-                                return isNaN(diff) ? a[1].localeCompare(b[1]) : diff;
+                                return isNaN(diff) ? b[1].localeCompare(a[1]) : diff;
                             });
                         } else {
                             featureValues.sort(function(a, b) {
                                 var diff = b[1] - a[1];
-                                return isNaN(diff) ? b[1].localeCompare(a[1]) : diff;
+                                return isNaN(diff) ? a[1].localeCompare(b[1]) : diff;
                             });
                         }
                         var sortValues = featureValues.map(function(featureValue) {
@@ -734,37 +748,30 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 adjustDimensions();
             }
 
-            var cutoffLevel = 0;
-
+            var selectedRownames = [];
             function animateCutoff(cutoff) {
+                selectedRownames = [];
                 cutoff = Math.floor(cutoff);
-                cutoffLevel = cutoff;
                 d3.selectAll('.square')
-                    .classed('cuttoffHighlight', false);
+                    .classed('cutoffHighlight', false);
                 d3.selectAll('.bar')
-                    .classed('cuttoffHighlight', false);
-                statistics.map(function(d) { return d[ranking]; })
-                    .sort(function(a, b) { return a - b; })
+                    .classed('cutoffHighlight', false);
+                statistics.slice().sort(function(a, b) { return getInternalSortValue(a[ranking]) - getInternalSortValue(b[ranking]); })
                     .filter(function(d, i) { return i < cutoff; })
-                    .forEach(function(d) {
-                        d3.select('.bar.idx-' + smartRUtils.makeSafeForCSS(d[0])).classed('cuttoffHighlight', true);
-                        d3.selectAll('.square.rowname-' + smartRUtils.makeSafeForCSS(rowNames[d[0]])).classed('cuttoffHighlight', true);
+                    .forEach(function(d, i) {
+                        selectedRownames.push(d.ROWNAME);
+                        d3.select('.bar.idx-' + i).classed('cutoffHighlight', true);
+                        d3.selectAll('.square.rowname-' + smartRUtils.makeSafeForCSS(d.ROWNAME)).classed('cutoffHighlight', true);
                     });
             }
 
             function cutoff() {
-                //HeatmapService.startScriptExecution({
-                //    taskType: 'run',
-                //    arguments: params,
-                //    onUltimateSuccess: HeatmapService.runAnalysisSuccess,
-                //    onUltimateFailure: HeatmapService.runAnalysisFailed,
-                //    phase: 'run',
-                //    progressMessage: 'Calculating',
-                //    successMessage: undefined
-                //});
-                // TODO: Use ajax service to be provided by ajaxServices.js to re-compute analysis
-                // with new arguments (in this case filter for cut-off)
-                scope.params.max_row = maxRows - cutoffLevel - 1;
+                // if no rownames selected we reset the model
+                if (selectedRownames.length === 0) {
+                    scope.params.selections.selectedRownames = [];
+                }
+                scope.params.selections.selectedRownames = JSON.parse(JSON.stringify(scope.params.selections.selectedRownames))
+                    .concat(selectedRownames);
                 $('run-button input').click();
             }
 
@@ -860,7 +867,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('fill', function(d) {
                         return colorScale(1 / (1 + Math.pow(Math.E, -d.ZSCORE)));
                     });
-
+                    
                 d3.selectAll('.legendColor')
                     .transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
@@ -885,8 +892,10 @@ angular.module('smartRApp').directive('heatmapPlot', [
                                 case 'subset':
                                     return featureColorSetBinary[d.VALUE - 1];
                                 case 'numeric':
-                                    colorScale.range(featureColorSetSequential);
-                                    return colorScale(1 / (1 + Math.pow(Math.E, -d.ZSCORE)));
+                                    var scale = d3.scale.quantile()
+                                        .domain([0, 1])
+                                        .range(featureColorSetSequential);
+                                    return scale(1 / (1 + Math.pow(Math.E, -d.ZSCORE)));
                                 default:
                                     return featureColorCategorical(d.VALUE);
                             }
@@ -969,17 +978,17 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('transform', function(d) {
                         return 'translate(' + d.x + ',' + (-spacing - w + d.y) + ')';
                     }).on('click', function(d) {
-                    var previousSelection = selectedColNames.slice();
-                    unselectAll();
-                    var leafs = d.index.split(' ');
-                    for (var i = 0; i < leafs.length; i++) {
-                        var colName = colNames[leafs[i]];
-                        selectCol(colName);
-                    }
-                    if (previousSelection.sort().toString() === selectedColNames.sort().toString()) {
+                        var previousSelection = selectedColNames.slice();
                         unselectAll();
-                    }
-                })
+                        var leafs = d.index.split(' ');
+                        for (var i = 0; i < leafs.length; i++) {
+                            var colName = colNames[leafs[i]];
+                            selectCol(colName);
+                        }
+                        if (previousSelection.sort().toString() === selectedColNames.sort().toString()) {
+                            unselectAll();
+                        }
+                    })
                     .on('mouseover', function(d) {
                         tip.show('Height: ' + d.height);
                     })
@@ -1025,15 +1034,14 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('transform', function(d) {
                         return 'translate(' + (width + spacing + h - d.y) + ',' + d.x + ')';
                     }).on('click', function(d) {
-                    var leafs = d.index.split(' ');
-                    var genes = [];
-                    leafs.forEach(function(leaf) {
-                        var rowName = rowNames[leaf];
-                        var split = rowName.split("--");
-                        split.shift();
-                        genes = genes.concat(split);
-                    });
-                    var baseURL = EndpointService.getMasterEndpoint().url;
+                        var leafs = d.index.split(' ');
+                        var genes = [];
+                        leafs.forEach(function(leaf) {
+                            var rowName = rowNames[leaf];
+                            var split = rowName.split("--");
+                            split.shift();
+                            genes = genes.concat(split);
+                        });
 
                     var request = $.ajax({
                         url: baseURL + '/SmartR/biocompendium',
@@ -1044,17 +1052,17 @@ angular.module('smartRApp').directive('heatmapPlot', [
                         }
                     });
 
-                    request.then(
-                        function(response) {
-                            var sessionID = response.match(/tmp_\d+/)[0];
-                            var url = 'http://biocompendium.embl.de/' +
-                                'cgi-bin/biocompendium.cgi?section=pathway&pos=0&background=whole_genome&session=' +
-                                sessionID + '&list=gene_list_1__1&list_size=15&org=human';
-                            window.open(url);
-                        },
-                        function(response) { alert("Error:", response); }
-                    );
-                })
+                        request.then(
+                            function(response) {
+                                var sessionID = response.match(/tmp_\d+/)[0];
+                                var url = 'http://biocompendium.embl.de/' +
+                                    'cgi-bin/biocompendium.cgi?section=pathway&pos=0&background=whole_genome&session=' +
+                                    sessionID + '&list=gene_list_1__1&list_size=15&org=human';
+                                window.open(url);
+                            },
+                            function(response) { alert("Error:", response); }
+                        );
+                    })
                     .on('mouseover', function(d) {
                         tip.show('Height: ' + d.height);
                     })
@@ -1077,13 +1085,10 @@ angular.module('smartRApp').directive('heatmapPlot', [
             function updateColOrder(sortValues, update) {
                 update = typeof update === 'undefined' ? true : update;
                 var newColnames = [];
-                var newPatientIDs = [];
                 sortValues.forEach(function(sortValue) {
                     newColnames.push(colNames[sortValue]);
-                    newPatientIDs.push(patientIDs[sortValue]);
                 });
                 colNames = newColnames;
-                patientIDs = newPatientIDs;
                 unselectAll();
                 removeColDendrogram();
                 if (update) {

@@ -32,12 +32,11 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
                             // grails response looks like this:
                             // { "id": 1842083, "source": "", "keyword": "TPO", "synonyms":
                             // "(TDH2A, MSA, TPX)", "category": "GENE", "display": "Gene" }
-                            var r = [];
-                            grailsResponse.rows.forEach(function(v) {
-                                r.push({
+                            var r = grailsResponse.rows.map(function(v) {
+                                return {
                                     label: v.keyword,
                                     value: v
-                                });
+                                }
                             });
                             return response(r);
                         }
@@ -97,10 +96,9 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
                         headers: headers
                     });
 
-                    curXHR.finally(function() { curXHR = null; });
+                    curXHR.always(function() { curXHR = null; })
                     return curXHR.then(
                         function(data) {
-                            data = data.data;
                             data = data.substring(5, data.length - 1);  // loadSearchPathways returns String with null (JSON).
                                                                         // This strips it off
                             response(JSON.parse(data));
