@@ -27,10 +27,12 @@ angular.module('smartRApp', [ 'transmartBaseUiConstants', 'tmEndpoints'])
     });
 */
 
-angular.module('smartRApp').run(['$templateCache', function($templateCache) {$templateCache.put('src/containers/boxplot/boxplot.content.html','<div class="main-container">\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="NUMERIC" min="1" max="1" label="Numerical Variable" tooltip="Select a single numerical variable that you would like to have displayed.">\n            </concept-box>\n            <!----Nice idea but somehow lost it\'s initial purpose because cross-study support is gone.\n            Maybe implement later--->\n            <!----<concept-box style="display: inline-block;"--->\n                             <!----concept-group="fetch.conceptBoxes.subsets"--->\n                             <!----type="LD-categorical"--->\n                             <!----min="0"--->\n                             <!----max="-1"--->\n                             <!----label="(optional) Categorical Variables"--->\n                             <!----tooltip="Select an arbitrary amount of categorical variables to split the numerical variable into subsets.">--->\n            <!----</concept-box>--->\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1,2]">\n            </fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <br>\n            <br>\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n            </run-button>\n            <br>\n            <br>\n            <boxplot data="runAnalysis.scriptResults" width="1000" height="500"></boxplot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
+angular.module('smartRApp').run(['$templateCache', function($templateCache) {$templateCache.put('src/containers/boxplot/boxplot.content.html','<div class="main-container">\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="1" max="1" label="Numerical Variable" tooltip="Select a single numerical variable that you would like to have displayed.">\n            </concept-box>\n            <!----Nice idea but somehow lost it\'s initial purpose because cross-study support is gone.\n            Maybe implement later--->\n            <!----<concept-box style="display: inline-block;"--->\n                             <!----concept-group="fetch.conceptBoxes.subsets"--->\n                             <!----type="LD-categorical"--->\n                             <!----min="0"--->\n                             <!----max="-1"--->\n                             <!----label="(optional) Categorical Variables"--->\n                             <!----tooltip="Select an arbitrary amount of categorical variables to split the numerical variable into subsets.">--->\n            <!----</concept-box>--->\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1,2]">\n            </fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <br>\n            <br>\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="boxplot.svg" target="boxplot"></capture-plot-button>\n            <br>\n            <br>\n            <boxplot data="runAnalysis.scriptResults" width="1000" height="500"></boxplot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
 $templateCache.put('src/containers/boxplot/boxplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="40%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/heatmap/heatmap.content.html','<div ng-controller="HeatmapController" class="main-container">\n\n    <tab-container>\n        <!----========================================================================================================-->\n        <!---- Fetch Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box concept-group="fetch.conceptBoxes.highDimensional" type="HIGH_DIMENSIONAL" min="1" max="-1" label="High Dimensional" tooltip="Select high dimensional data node(s) from the Data Set Explorer Tree and drag it into the box.\n                The nodes needs to be from the same platform.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.numeric" type="NUMERIC" min="0" max="-1" label="Numeric Variables" tooltip="Select numeric data node(s) from the Data Set Explorer Tree and drag it into the box.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.categoric" type="CATEGORICAL_OPTION" min="0" max="-1" label="Categoric Variables" tooltip="Select categoric data node(s) from the Data Set Explorer Tree and drag it into the box.">\n            </concept-box>\n\n            <biomarker-selection biomarkers="fetch.selectedBiomarkers"></biomarker-selection>\n            <hr class="sr-divider">\n            <fetch-button loaded="fetch.loaded" running="fetch.running" concept-map="fetch.conceptBoxes" biomarkers="fetch.selectedBiomarkers" show-summary-stats="true" summary-data="fetch.scriptResults" all-samples="common.totalSamples" allowed-cohorts="[1,2]" number-of-rows="common.numberOfRows">\n            </fetch-button>\n            <br>\n            <summary-stats summary-data="fetch.scriptResults" images="fetch.images"></summary-stats>\n        </workflow-tab>\n\n        <!----========================================================================================================-->\n        <!---- Preprocess Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Preprocess" disabled="preprocess.disabled">\n            <!----Aggregate Probes-->\n            <div class="heim-input-field">\n                <input type="checkbox" ng-model="preprocess.params.aggregate">\n                <span>Aggregate probes</span>\n            </div>\n\n            <hr class="sr-divider">\n\n            <preprocess-button params="preprocess.params" show-summary-stats="true" summary-data="preprocess.scriptResults" running="preprocess.running" all-samples="common.totalSamples" number-of-rows="common.numberOfRows">\n            </preprocess-button>\n\n            <br>\n            <summary-stats summary-data="preprocess.scriptResults"></summary-stats>\n        </workflow-tab>\n\n\n        <!----========================================================================================================-->\n        <!----Run Analysis-->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <!----Number of max row to display-->\n            <div class="heim-input-field heim-input-number sr-input-area">\n                Show <input type="text" id="txtMaxRow" ng-model="runAnalysis.params.max_row">\n             <!--   of {{ common.numberOfRows }} rows in total. (< 1000 is preferable.) -->\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <h2>Order columns by:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="nodes" checked="checked"> Nodes\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="subjects">\n                        Subjects\n                    </label>\n                </fieldset>\n            </div>\n\n            <div class="heim-input-field sr-input-area">\n                <h2>I have read and accept the <a href="http://www.lifemapsc.com/genecards-suite-terms-of-use/" target="_blank">\n                    GeneCards TOU</a>\n                </h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="true"> yes (use GeneCards)\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="false" checked="checked"> no (use EMBL EBI)\n                    </label>\n                </fieldset>\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <sorting-criteria criteria="runAnalysis.params.ranking" samples="common.totalSamples" subsets="common.subsets">\n                </sorting-criteria>\n            </div>\n\n            <hr class="sr-divider">\n\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="heatmap.json" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="heatmap.svg" disabled="runAnalysis.download.disabled"></capture-plot-button>\n            <download-results-button disabled="runAnalysis.download.disabled"></download-results-button>\n            <br>\n            <workflow-warnings warnings="runAnalysis.scriptResults.warnings"></workflow-warnings>\n            <heatmap-plot data="runAnalysis.scriptResults" width="1200" height="1200" params="runAnalysis.params">\n            </heatmap-plot>\n\n        </workflow-tab>\n\n    </tab-container>\n</div>\n');
+$templateCache.put('src/containers/heatmap/heatmap.content.html','<div ng-controller="HeatmapController" class="main-container">\n\n    <tab-container>\n        <!----========================================================================================================-->\n        <!---- Fetch Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional" tooltip="Select high dimensional data node(s) from the data tree and drag it into the box.\n                The nodes need to be from the same platform.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.numeric" type="LD-numerical" min="0" max="-1" label="(optional) Numerical Variables" tooltip="Select numeric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.categoric" type="LD-categorical" min="0" max="-1" label="(optional) Categoric Variables" tooltip="Select categoric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <biomarker-selection biomarkers="fetch.selectedBiomarkers"></biomarker-selection>\n            <hr class="sr-divider">\n            <fetch-button loaded="fetch.loaded" running="fetch.running" concept-map="fetch.conceptBoxes" biomarkers="fetch.selectedBiomarkers" show-summary-stats="true" summary-data="fetch.scriptResults" all-samples="common.totalSamples" allowed-cohorts="[1,2]" number-of-rows="common.numberOfRows" has-preprocess-tab="true">\n            </fetch-button>\n            <br>\n            <summary-stats summary-data="fetch.scriptResults"></summary-stats>\n        </workflow-tab>\n\n        <!----========================================================================================================-->\n        <!---- Preprocess Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Preprocess" disabled="preprocess.disabled">\n            <!----Aggregate Probes-->\n            <div class="heim-input-field">\n                <input type="checkbox" ng-model="preprocess.params.aggregate">\n                <span>Aggregate probes</span>\n            </div>\n\n            <hr class="sr-divider">\n\n            <preprocess-button params="preprocess.params" show-summary-stats="true" summary-data="preprocess.scriptResults" running="preprocess.running" all-samples="common.totalSamples" number-of-rows="common.numberOfRows">\n            </preprocess-button>\n\n            <br>\n            <summary-stats summary-data="preprocess.scriptResults"></summary-stats>\n        </workflow-tab>\n\n\n        <!----========================================================================================================-->\n        <!----Run Analysis-->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <!----Number of max row to display-->\n            <div class="heim-input-field heim-input-number sr-input-area">\n                Show <input type="text" id="txtMaxRow" ng-model="runAnalysis.params.max_row">\n                of {{ common.numberOfRows }} rows in total. ( less than 1000 is preferable. )\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <h2>Group columns by:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="nodes" checked="checked"> Node Order\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="subjects">\n                        Subject ID\n                    </label>\n                </fieldset>\n            </div>\n\n            <div class="heim-input-field sr-input-area">\n                <h2>I have read and accept the <a href="http://www.lifemapsc.com/genecards-suite-terms-of-use/" target="_blank">\n                    GeneCards TOU</a>\n                </h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="true"> yes (use GeneCards)\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="false" checked="checked"> no (use EMBL EBI)\n                    </label>\n                </fieldset>\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <sorting-criteria criteria="runAnalysis.params.ranking" samples="common.totalSamples" subsets="common.subsets">\n                </sorting-criteria>\n            </div>\n\n            <hr class="sr-divider">\n\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="heatmap.json" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="heatmap.svg" disabled="runAnalysis.download.disabled" target="heatmap-plot">\n            </capture-plot-button>\n            <download-results-button disabled="runAnalysis.download.disabled"></download-results-button>\n            <br>\n            <workflow-warnings warnings="runAnalysis.scriptResults.warnings"></workflow-warnings>\n            <heatmap-plot data="runAnalysis.scriptResults" width="1200" height="1200" params="runAnalysis.params">\n            </heatmap-plot>\n\n        </workflow-tab>\n\n    </tab-container>\n</div>\n');
 $templateCache.put('src/containers/heatmap/heatmap.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
+$templateCache.put('src/containers/correlation/correlation.content.html','<div ng-controller="CorrelationController" class="main-container">\n\n        <tab-container>\n\n            <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="2" max="2" label="Numerical Variables" tooltip="Select two numerical variables from the tree to compare them.">\n                </concept-box>\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.annotations" type="LD-categorical" min="0" max="-1" label="(optional) Categorical Variables" tooltip="Select an arbitrary amount of categorical variables from the tree to annotate the numerical datapoints.">\n                </concept-box>\n                <br>\n                <br>\n                <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1]">\n                </fetch-button>\n            </workflow-tab>\n\n            <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n                <div class="heim-input-field sr-input-area">\n                    <h2>Data transformation:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="raw" checked="checked"> Raw Values\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log2" checked="checked"> Log2\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log10" checked="checked"> Log10\n\n                        </label>\n                    </fieldset>\n                </div>\n                <div class="heim-input-field sr-input-area">\n                    <h2>Correlation computation method:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="pearson" checked="checked"> Pearson\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="kendall"> Kendall\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="spearman"> Spearman\n                        </label>\n                    </fieldset>\n                </div>\n                <hr class="sr-divider">\n                <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n                </run-button>\n                <capture-plot-button filename="correlation.svg" target="correlation-plot"></capture-plot-button>\n                <br>\n                <br>\n                <correlation-plot data="runAnalysis.scriptResults" width="1500" height="1500"></correlation-plot>\n            </workflow-tab>\n\n        </tab-container>\n\n    </div>\n\n\n');
+$templateCache.put('src/containers/correlation/correlation.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
 $templateCache.put('src/containers/templates/biomarkerSelection.html','<div class="sr-fetch-params-area">\n  <div class="heim-input-field heim-autocomplete">\n    <label for="heim-input-txt-identifier">Select a biomarker:</label>\n    <input id="heim-input-txt-identifier">\n    <span style="color: darkgrey"> Biomarker can be a gene, pathway, mirID or UniProtID.</span>\n    <div id="heim-input-list-identifiers">\n      <ul><li ng-repeat="biomarker in biomarkers">\n        <div>\n          <span class="identifier-type">{{biomarker.type}} </span>\n          <span class="identifier-name">{{biomarker.name}} </span>\n          <span class="identifier-synonyms">{{biomarker.synonyms}} </span>\n        </div>\n        <button class="identifier-delete" ng-click="removeIdentifier(biomarker)">&#x2716;</button>\n      </li></ul>\n    </div>\n  </div>\n</div>\n');
 $templateCache.put('src/containers/templates/boxplot.html','<workflow-controls ng-show="showControls">\n    <div>\n        <label for="sr-boxplot-log-check">Log2</label>\n        <input type="checkbox" id="sr-boxplot-log-check">\n    </div>\n    <div>\n        <label for="sr-boxplot-jitter-check">Jitter</label>\n        <input type="checkbox" id="sr-boxplot-jitter-check">\n    </div>\n    <div>\n        <label for="sr-boxplot-kde-check">KDE</label>\n        <input type="checkbox" id="sr-boxplot-kde-check">\n    </div>\n    <div>\n        <input type="button" id="sr-boxplot-reset-btn" value="Reset">\n    </div>\n    <div>\n        <input type="button" id="sr-boxplot-remove-btn" value="Remove Outliers">\n    </div>\n</workflow-controls>\n<div id="visualisation"></div>\n');
 $templateCache.put('src/containers/templates/conceptBox.html','<div class="heim-input-field heim-dropzone sr-hd-input" data-drop="true" ng-model="droppedNode" jqyoui-droppable="{multiple:true, onDrop:\'onNodeDropEvent(droppedNode)\'}">\n    <label style="display: inline">{{label}} <i class="ui-icon ui-icon-info sr-tooltip-dialog" title="{{tooltip}}"> </i></label>\n    <br><br>\n    <span ng-show="instructionMinNodes" class="sr-instruction">Drag at least {{min}} node(s) into the box<br></span>\n    <span ng-show="instructionMaxNodes" class="sr-instruction">Select at most {{max}} node(s)<br></span>\n    <span ng-show="instructionNodeType" class="sr-instruction">Node(s) do not have the correct type<br></span>\n    <span ng-show="instructionNodePlatform" class="sr-instruction">Nodes must have the same platform</span>\n    <div class="sr-drop-input" ng-class="{true:\'sr-drop-input-valid\', false:\'sr-drop-input-invalid\'}[conceptGroup.valid]" style="overflow-y:auto">\n        <ul>\n            <li ng-repeat="node in conceptGroup.concepts"> {{node.title}}</li>\n        </ul>\n    </div>\n\n\n    <div style="margin-top: 10px; text-align: right">\n        <input type="button" value="Clear Window" class="sr-drop-btn">\n    </div>\n</div>\n');
@@ -43,12 +45,56 @@ $templateCache.put('src/containers/templates/summaryStatistics.html','<table cla
 $templateCache.put('src/containers/templates/tabContainer.html','<div id="heim-tabs" style="margin-top: 25px">\n    <ul>\n        <li class="heim-tab" ng-repeat="tab in tabs">\n            <a href="#{{tab.id}}" ng-style="{\'color\': tab.disabled ? \'grey\' : \'black\', \'pointer-events\': tab.disabled ? \'none\' : null}">\n                {{tab.name}}\n            </a>\n        </li>\n    </ul>\n    <ng-transclude-replace></ng-transclude-replace>\n</div>');
 $templateCache.put('src/containers/templates/workflowControls.html','<div class="sr-workflow-controls" ng-transclude></div>\n\n');
 $templateCache.put('src/containers/templates/workflowWarnings.html','<div class="sr-warning-box" ng-style="{\'visibility\': visibility}">\n    {{text}}\n</div>\n');
-$templateCache.put('src/containers/volcanoplot/volcanoplot.content.html','<div ng-controller="VolcanoplotController" class="main-container">\n\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.highDimensional" type="HIGH_DIMENSIONAL" min="1" max="-1" label="High Dimensional Variables" tooltip="Select high dimensional data node(s) from the Data Set Explorer Tree and drag it into the box.\n                             The nodes needs to be from the same platform.">\n            </concept-box>\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[2]">\n            </fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="volcanoplot.json" running="runAnalysis.running">\n            </run-button>\n            <br>\n            <br>\n            <volcano-plot data="runAnalysis.scriptResults" width="1000" height="800"></volcano-plot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
-$templateCache.put('src/containers/volcanoplot/volcanoplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/timeline/timeline.content.html','<div ng-controller="TimelineController" class="main-container">\n\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data">\n            <concept-box concept-group="conceptBoxes.datapoints"></concept-box>\n            <br>\n            <br>\n            <fetch-button concept-map="conceptBoxes" allowed-cohorts="[1]"></fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis">\n            <run-button button-name="Create Plot" results-storage="scriptResults" script-to-run="run" parameter-map="params"></run-button>\n            <br>\n            <br>\n            <timeline-plot data="scriptResults" width="1200" height="1200"></timeline-plot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
+$templateCache.put('src/containers/timeline/timeline.content.html','<div ng-controller="TimelineController" class="main-container">\n\n\t\t<tab-container>\n\n\t\t\t<workflow-tab tab-name="Fetch Data">\n\t\t\t\t<concept-box concept-group="conceptBoxes.datapoints"></concept-box>\n\t\t\t\t<br>\n\t\t\t\t<br>\n\t\t\t\t<fetch-button concept-map="conceptBoxes"></fetch-button>\n\t\t\t</workflow-tab>\n\n\t\t\t<workflow-tab tab-name="Run Analysis">\n\t\t\t\t<run-button button-name="Create Plot" results-storage="scriptResults" script-to-run="run" parameter-map="params"></run-button>\n\t\t\t\t<br>\n\t\t\t\t<br>\n\t\t\t\t<timeline-plot data="scriptResults" width="1200" height="1200"></timeline-plot>\n\t\t\t</workflow-tab>\n\n\t\t</tab-container>\n\n</div>\n');
 $templateCache.put('src/containers/timeline/timeline.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/correlation/correlation.content.html','<div ng-controller="CorrelationController" class="main-container">\n\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="NUMERIC" min="2" max="2" label="Numerical Variables" tooltip="Select two numerical variables from the tree to compare them.">\n            </concept-box>\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.annotations" type="CATEGORICAL" min="0" max="-1" label="(optional) Categorical Variables" tooltip="Select an arbitrary amount of categorical variables from the tree to annotate the numerical datapoints.">\n            </concept-box>\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1]">\n            </fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <div class="heim-input-field sr-input-area">\n                <h2>Data transformation:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.transformation" value="raw" checked="checked"> Raw Values\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.transformation" value="log2" checked="checked"> Log2\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.transformation" value="log10" checked="checked"> Log10\n\n                    </label>\n                </fieldset>\n            </div>\n            <div class="heim-input-field sr-input-area">\n                <h2>Correlation computation method:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.method" value="pearson" checked="checked"> Pearson\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.method" value="kendall"> Kendall\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.method" value="spearman"> Spearman\n                    </label>\n                </fieldset>\n            </div>\n            <hr class="sr-divider">\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n            </run-button>\n            <br>\n            <br>\n            <correlation-plot data="runAnalysis.scriptResults" width="1500" height="1500"></correlation-plot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
-$templateCache.put('src/containers/correlation/correlation.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');}]);
+$templateCache.put('src/containers/volcanoplot/volcanoplot.content.html','<div ng-controller="VolcanoplotController" class="main-container">\n\n    <tab-container>\n\n            <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional Variables" tooltip="Select high dimensional data node(s) from the data tree and drag it into the box.\n                             The nodes needs to be from the same platform.">\n            </concept-box>\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[2]">\n            </fetch-button>\n        </workflow-tab>\n\n            <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n                <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="volcanoplot.json" running="runAnalysis.running">\n                </run-button>\n                <capture-plot-button filename="volcanoplot.svg" target="volcano-plot"></capture-plot-button>\n                <br>\n                <br>\n                <volcano-plot data="runAnalysis.scriptResults" width="1000" height="800"></volcano-plot>\n            </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
+$templateCache.put('src/containers/volcanoplot/volcanoplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');}]);
+
+'use strict';
+
+angular.module('smartRApp').controller('BoxplotController', [
+    '$scope',
+    'smartRUtils',
+    'commonWorkflowService',
+    function($scope, smartRUtils, commonWorkflowService) {
+
+        commonWorkflowService.initializeWorkflow('boxplot', $scope);
+
+        $scope.fetch = {
+            running: false,
+            disabled: false,
+            loaded: false,
+            conceptBoxes: {
+                datapoints: {concepts: [], valid: false}
+            }
+        };
+
+        $scope.runAnalysis = {
+            running: false,
+            disabled: true,
+            scriptResults: {},
+            params: {}
+        };
+
+        $scope.$watchGroup(['fetch.running', 'runAnalysis.running'],
+            function(newValues) {
+                var fetchRunning = newValues[0],
+                    runAnalysisRunning = newValues[1];
+
+                // clear old results
+                if (fetchRunning) {
+                    $scope.runAnalysis.scriptResults = {};
+                }
+
+                // disable tabs when certain criteria are not met
+                $scope.fetch.disabled = runAnalysisRunning;
+                $scope.runAnalysis.disabled = fetchRunning || !$scope.fetch.loaded;
+            }
+        );
+
+    }]);
+
+
 //# sourceURL=correlation.js
 
 'use strict';
@@ -129,8 +175,7 @@ angular.module('smartRApp').controller('HeatmapController', [
                 categoric: {concepts: [], valid: true}
             },
             selectedBiomarkers: [],
-            scriptResults: {},
-            images: {}
+            scriptResults: {}
         };
 
         // ------------------------------------------------------------- //
@@ -152,6 +197,9 @@ angular.module('smartRApp').controller('HeatmapController', [
             disabled: true,
             running: false,
             params: {
+                selections: {
+                    selectedRownames: [],
+                },
                 max_row: 100,
                 sorting: 'nodes',
                 ranking: 'coef',
@@ -225,7 +273,7 @@ angular.module('smartRApp').controller('TimelineController',
         commonWorkflowService.initializeWorkflow('timeline', $scope);
 
         // model
-        $scope.conceptBoxes = {datapoints:{concepts:[]}};
+        $scope.conceptBoxes = {};
         $scope.scriptResults = {};
         $scope.params = {};
     }]);
@@ -309,12 +357,11 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
                             // grails response looks like this:
                             // { "id": 1842083, "source": "", "keyword": "TPO", "synonyms":
                             // "(TDH2A, MSA, TPX)", "category": "GENE", "display": "Gene" }
-                            var r = [];
-                            grailsResponse.rows.forEach(function(v) {
-                                r.push({
+                            var r = grailsResponse.rows.map(function(v) {
+                                return {
                                     label: v.keyword,
                                     value: v
-                                });
+                                }
                             });
                             return response(r);
                         }
@@ -374,10 +421,9 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
                         headers: headers
                     });
 
-                    curXHR.finally(function() { curXHR = null; });
+                    curXHR.always(function() { curXHR = null; })
                     return curXHR.then(
                         function(data) {
-                            data = data.data;
                             data = data.substring(5, data.length - 1);  // loadSearchPathways returns String with null (JSON).
                                                                         // This strips it off
                             response(JSON.parse(data));
@@ -410,8 +456,8 @@ angular.module('smartRApp').directive('capturePlotButton', [function() {
     // aux for downloadSVG
     var copyWithCollapsedCSS = function(svgElement) {
         var relevantProperties = [
-            'fill-opacity', 'fill', 'stroke', 'font-size', 'font-family',
-            'shape-rendering', 'stroke-width'
+            'fill-opacity', 'fill', 'stroke', 'font-size', 'font-family', 'font-weight',
+            'shape-rendering', 'stroke-width', 'opacity', 'text-anchor'
         ];
         var clonedSvg = jQuery(svgElement).clone().attr('display', 'none');
         clonedSvg.insertAfter(svgElement);
@@ -471,8 +517,9 @@ angular.module('smartRApp').directive('capturePlotButton', [function() {
     return {
         restrict: 'E',
         scope: {
-            disabled: '=',
-            filename: '@'
+            disabled: '=?',
+            filename: '@',
+            target: '@'
         },
         template:
             '<input type="button" value="Capture" class="heim-action-button" ng-click="capture()">',
@@ -491,7 +538,10 @@ angular.module('smartRApp').directive('capturePlotButton', [function() {
             }
 
             scope.capture = function() {
-                var svgElement = jQuery('svg.visualization')[0];
+                var svgElement = $(scope.target + ' svg')[0];
+                if (!svgElement) {
+                    return;
+                }
                 downloadSVG(svgElement, scope.filename);
             };
 
@@ -570,35 +620,34 @@ angular.module('smartRApp').directive('conceptBox', [
                     template_tooltip = element[0].querySelector('.sr-tooltip-dialog');
 
                 // instantiate tooltips
-                $(template_tooltip).tooltip({track: true, tooltipClass: "sr-ui-tooltip"});
+                $(template_tooltip).tooltip({track: true, tooltipClass:"sr-ui-tooltip"});
 
-                var _clearWindow = function () {
-                    scope.conceptGroup.concepts.length = 0;
-                    // in order to avoid reassignment of a shared variable with watchers
+                var _clearWindow = function() {
+                    $(template_box).children().remove();
                 };
 
+                var _getConcepts = function() {
+                    return $(template_box).children().toArray().map(function(childNode) {
+                        return childNode.getAttribute('conceptid');
+                    });
+                };
 
-                scope.onNodeDropEvent = function (event, info, node) {
-                    scope.conceptGroup.concepts.push(node);
-                    console.log(node);
-                    scope.validate();
+                var _activateDragAndDrop = function() {
+                    var extObj = Ext.get(template_box);
+                    var dtgI = new Ext.dd.DropTarget(extObj, {ddGroup: 'makeQuery'});
+                    dtgI.notifyDrop = dropOntoCategorySelection; // jshint ignore:line
                 };
 
                 var typeMap = {
                     hleaficon: 'HD',
-                    null: 'CATEGORICAL_OPTION', // FIXME: alphaicon does not exist yet in transmartApp master branch
-                    valueicon: 'NUMERIC'
+                    alphaicon: 'LD-categorical',
+                    null: 'LD-categorical', // a fix for older tm version without alphaicon
+                    valueicon: 'LD-numerical'
                 };
-                var _containsOnlyCorrectType = function () {
-                    if (scope.type === undefined) return true;
-                    var correct = true;
-                    scope.conceptGroup.concepts.forEach(function (conceptObj) {
-                        if (scope.type != conceptObj.type) {
-                            correct = false;
-                            return ;
-                        }
+                var _containsOnlyCorrectType = function() {
+                    return $(template_box).children().toArray().every(function(childNode) {
+                        return typeMap[childNode.getAttribute('setnodetype')] === scope.type;
                     });
-                    return correct;
                 };
 
                 var _getNodeDetails = function (conceptKeys, callback) {
@@ -617,59 +666,64 @@ angular.module('smartRApp').directive('conceptBox', [
 
                     request.then(
                         callback,
-                        function () {
+                        function() {
                             alert('Could not fetch node details. Network connection lost?');
                         });
                 };
 
+                // activate drag & drop for our conceptBox and color it once it is rendered
+                scope.$evalAsync(function() {
+                    _activateDragAndDrop();
+                });
 
                 // bind the button to its clearing functionality
-                template_btn.addEventListener('click', function () {
+                template_btn.addEventListener('click', function() {
                     _clearWindow();
-                    scope.validate();
                 });
 
                 // this watches the childNodes of the conceptBox and updates the model on change
-                /*new MutationObserver(function() {
-                 scope.conceptGroup.concepts = _getConcepts(); // update the model
-                 scope.validate();
-                 scope.$apply();
-                 }).observe(template_box, { childList: true });*/
+                new MutationObserver(function() {
+                    scope.conceptGroup.concepts = _getConcepts(); // update the model
+                    scope.validate();
+                    scope.$apply();
+                }).observe(template_box, { childList: true });
 
-                scope.validate = function () {
+                scope.validate = function() {
                     scope.instructionMinNodes = scope.conceptGroup.concepts.length < min;
                     scope.instructionMaxNodes = max !== -1 && scope.conceptGroup.concepts.length > max;
                     scope.instructionNodeType = !_containsOnlyCorrectType();
-                    if (scope.type === 'HD' && scope.conceptGroup.concepts.length > 1) {
-                        _getNodeDetails(scope.conceptGroup.concepts, function (response) {
-                            if (Object.keys(response.data).length < 2) {
-                                var platforms = response.data[Object.keys(response.data)[0]].platforms;
-                                scope.instructionNodePlatform = !platforms.every(function (el) {
-                                    return el.title === platforms[0].title;
-                                });
-                            } else {
-                                scope.instructionNodePlatform = true;
-                            }
-                        });
-                    } else {
-                        scope.instructionNodePlatform = false;
-                    }
+                    // FIXME: Disabled for now because this causes problems with certain datasets for unknown reasons
+                    // if (scope.type === 'HD' && scope.conceptGroup.concepts.length > 1) {
+                    //     _getNodeDetails(scope.conceptGroup.concepts, function(response) {
+                    //         if (Object.keys(response.data).length < 2) {
+                    //             var platforms = response.data[Object.keys(response.data)[0]].platforms;
+                    //             scope.instructionNodePlatform = !platforms.every(function(el) { 
+                    //                 return el.title === platforms[0].title;
+                    //             });
+                    //         } else {
+                    //             scope.instructionNodePlatform = true;
+                    //         }
+                    //     });
+                    // } else {
+                    //     scope.instructionNodePlatform = false;
+                    // }
+                    scope.instructionNodePlatform = false;
                 };
 
                 scope.$watchGroup([
-                        'instructionNodeType',
-                        'instructionNodePlatform',
-                        'instructionMaxNodes',
-                        'instructionMinNodes'],
-                    function (newValue) {
+                    'instructionNodeType',
+                    'instructionNodePlatform',
+                    'instructionMaxNodes',
+                    'instructionMinNodes'],
+                    function(newValue) {
                         var instructionNodeType = newValue[0],
                             instructionNodePlatform = newValue[1],
                             instructionMaxNodes = newValue[2],
                             instructionMinNodes = newValue[3];
                         scope.conceptGroup.valid = !(instructionNodeType ||
-                        instructionNodePlatform ||
-                        instructionMaxNodes ||
-                        instructionMinNodes);
+                                                     instructionNodePlatform ||
+                                                     instructionMaxNodes ||
+                                                     instructionMinNodes);
                     });
 
                 scope.validate();
@@ -753,7 +807,8 @@ angular.module('smartRApp').directive('fetchButton', [
                 allSamples: '=?',
                 numberOfRows: '=?',
                 allowedCohorts: '=',
-                projection: '@?'
+                projection: '@?',
+                hasPreprocessTab: '=?'
             },
             templateUrl: 'src/containers/templates/fetchButton.html',
             link: function(scope, element) {
@@ -761,7 +816,11 @@ angular.module('smartRApp').directive('fetchButton', [
                     template_msg = element.children()[1];
 
                 var _onSuccess = function() {
-                    template_msg.innerHTML = 'Task complete! Go to the "Preprocess" or "Run Analysis" tab to continue.';
+                    if (scope.hasPreprocessTab) {
+                        template_msg.innerHTML = 'Task complete! Go to the "Preprocess" or "Run Analysis" tab to continue.';
+                    } else {
+                        template_msg.innerHTML = 'Task complete! Go to the "Run Analysis" tab to continue.';
+                    }
                     scope.loaded = true;
                     template_btn.disabled = false;
                     scope.running = false;
@@ -983,11 +1042,15 @@ angular.module('smartRApp').directive('runButton', [
                 script: '@scriptToRun',
                 name: '@buttonName',
                 filename: '@?',
-                params: '=?argumentsToUse'
+                params: '=?argumentsToUse',
+                waitMessage: '@?'
             },
             templateUrl:  'src/containers/templates/runButton.html',
             link: function(scope, element) {
                 var params = scope.params ? scope.params : {};
+                if (!scope.waitMessage) {
+                    scope.waitMessage = 'Creating plot, please wait';
+                }
 
                 var template_btn = element.children()[0],
                     template_msg = element.children()[1];
@@ -1027,7 +1090,7 @@ angular.module('smartRApp').directive('runButton', [
                     scope.storage = {};
                     scope.disabled = true;
                     scope.running = true;
-                    template_msg.innerHTML = 'Creating plot, please wait <span class="blink_me">_</span>';
+                    template_msg.innerHTML = scope.waitMessage + ' <span class="blink_me">_</span>';
 
                     rServeService.startScriptExecution({
                         taskType: scope.script,
@@ -1060,38 +1123,15 @@ angular.module('smartRApp').directive('sortingCriteria', [
     }
 ]);
 
-//# sourceURL=summaryStatistics.js
-
 'use strict';
 
-angular.module('smartRApp').directive('summaryStats',
-    ['$rootScope', 'rServeService', '$log',
-    function($rootScope, rServeService, $log) {
+angular.module('smartRApp').directive(['summaryStats',
+    '$rootScope',
+    function($rootScope) {
         return {
             restrict: 'E',
             scope: {
-                summaryData: '=',
-                images: '='
-            },
-            link: function(scope, elm, attrs) {
-                scope.$watch( function() {
-                    return scope.summaryData;
-                }, function(updated, old) {
-                    if (!_.isEqual(updated, old)) {
-                        _.each(updated.summary, function(sum) {
-                            sum.then( function(p) {
-                                var imgPath = p.img;
-
-                                rServeService.fetchImageResource(imgPath)
-                                    .then( function(res) {
-                                        scope.images[imgPath] = res;
-                                    }, function(e) {
-                                        $log.error("Error while fetching the image for path", imgPath, e);
-                                    });
-                            });
-                        });
-                    }
-                });
+                summaryData: '='
             },
             templateUrl:   'src/containers/templates/summaryStatistics.html'
         };
@@ -1128,11 +1168,18 @@ angular.module('smartRApp').directive('tabContainer',
 
 angular.module('smartRApp').directive('workflowControls', [
     '$rootScope',
-    function($rootScope) {
+    'smartRUtils',
+    function($rootScope, smartRUtils) {
         return {
             restrict: 'E',
             transclude: true,
-            templateUrl:  'src/containers/templates/workflowControls.html'
+            templateUrl:  'src/containers/templates/workflowControls.html',
+            link: function(scope, element) {
+                var controls = element.children()[0];
+                var scrollbarWidth = smartRUtils.getScrollBarWidth();
+                controls.style.bottom = scrollbarWidth + 'px';
+                controls.style.right = scrollbarWidth + 'px';
+            }
         };
     }
 ]);
@@ -1985,22 +2032,23 @@ angular.module('smartRApp').directive('boxplot', [
                 _addEventListeners();
             });
 
-            var currentSelection;
-            function updateSelection() {
-                d3.selectAll('.point').classed('brushed', false);
-                var extent = brush.extent();
-                var left = extent[0][0],
-                    top = extent[0][1],
-                    right = extent[1][0],
-                    bottom = extent[1][1];
-                currentSelection = d3.selectAll('.point')
-                    .filter(function (d) {
-                        var point = d3.select(this);
-                        return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
-                    })
-                    .classed('brushed', true)
-                    .map(function(d) { return d.patientID; });
-            }
+        var currentSelection;
+        function updateSelection() {
+            d3.selectAll('.point').classed('brushed', false);
+            var extent = brush.extent();
+            var left = extent[0][0],
+                top = extent[0][1],
+                right = extent[1][0],
+                bottom = extent[1][1];
+            currentSelection = d3.selectAll('.point')
+                .filter(function (d) {
+                    var point = d3.select(this);
+                    return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
+                })
+                .classed('brushed', true)
+                .data()
+                .map(function(d) { return d.patientID; });
+        }
 
             function excludeSelection() {
                 excludedPatientIDs = excludedPatientIDs.concat(currentSelection);
@@ -2025,10 +2073,10 @@ angular.module('smartRApp').directive('boxplot', [
                 d3.selectAll('.d3-tip').remove();
             }
 
-            function removeOutliers() {
-                currentSelection = d3.selectAll('.outlier').map(function (d) { return d.patientID; });
-                if (currentSelection) { excludeSelection(); }
-            }
+        function removeOutliers() {
+            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
+            if (currentSelection) { excludeSelection(); }
+        }
 
             function kernelDensityEstimator(kernel, x) {
                 return function (sample) {
@@ -2464,8 +2512,8 @@ angular.module('smartRApp').directive('correlationPlot', [
                 .on('contextmenu', function() {
                     d3.event.preventDefault();
                     contextMenu.show('<input id="sr-correlation-zoom-btn" value="Zoom" class="sr-ctx-menu-btn"><br/>' +
-                        '<input id="sr-correlation-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
-                        '<input id="sr-correlation-reset-btn" value="Reset" class="sr-ctx-menu-btn">');
+                                     '<input id="sr-correlation-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
+                                     '<input id="sr-correlation-reset-btn" value="Reset" class="sr-ctx-menu-btn">');
                     _addEventListeners();
                 });
 
@@ -2873,7 +2921,6 @@ angular.module('smartRApp').directive('heatmapPlot', [
             var extraFields = scope.data.extraFields;
             var features = scope.data.features.constructor === Array ? scope.data.features : [];
 
-            var patientIDs = scope.data.patientIDs.map(function(d) { return parseInt(d); });
             var colNames = scope.data.colNames; // unique
             var rowNames = scope.data.rowNames; // unique
 
@@ -2905,7 +2952,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
             var legendHeight = 40;
 
             var margin = {
-                top: gridFieldHeight * 2 + features.length * gridFieldHeight + dendrogramHeight + 100,
+                top: gridFieldHeight * 2 + longestColNameLength +  features.length * gridFieldHeight + dendrogramHeight + 100,
                 right: gridFieldWidth + 300 + dendrogramHeight,
                 bottom: 10,
                 left: histogramHeight
@@ -2930,13 +2977,27 @@ angular.module('smartRApp').directive('heatmapPlot', [
             zoomRange.addEventListener('mouseup', function() { zoom(parseInt(zoomRange.value)); });
             zoomRange.value = 100;
 
+            var setCutoffBtnText = function() {
+                if (parseInt(cutoffRange.value) === 0) {
+                    cutoffBtn.value = 'Reset Cutoff';
+                } else {
+                    cutoffBtn.value = 'Apply Cutoff';
+                }
+            };
+
             var cutoffBtn = smartRUtils.getElementWithoutEventListeners('sr-heatmap-cutoff-btn');
             cutoffBtn.addEventListener('click', cutoff);
 
             var cutoffRange = smartRUtils.getElementWithoutEventListeners('sr-heatmap-cutoff-range');
-            cutoffRange.addEventListener('mouseup', function() { animateCutoff(parseInt(cutoffRange.value)); });
-            cutoffRange.setAttribute('max', maxRows);
+            cutoffRange.addEventListener('input', function() {
+                animateCutoff(parseInt(cutoffRange.value));
+                setCutoffBtnText();
+            });
+            cutoffRange.setAttribute('max', maxRows - JSON.parse(JSON.stringify(scope.params.selections.selectedRownames)).length - 1);
             cutoffRange.value = 0;
+            cutoffRange.disabled = parseInt(cutoffRange.max) <= 1;
+            
+            setCutoffBtnText();
 
             var clusterSelect = smartRUtils.getElementWithoutEventListeners('sr-heatmap-cluster-select');
             clusterSelect.addEventListener('change', function() { cluster(clusterSelect.value); });
@@ -2988,6 +3049,9 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     case 'PVAL':
                     case 'ADJPVAL':
                         return 1 - value;
+                    case 'TTEST':
+                    case 'LOGFOLD':
+                        return Math.abs(value);
                     default:
                         return value;
                 }
@@ -3098,12 +3162,16 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 function getValueForSquareSorting(colName, rowName) {
                     var square = d3.select('.square' + '.colname-' + smartRUtils.makeSafeForCSS(colName) +
                         '.rowname-' + smartRUtils.makeSafeForCSS(rowName));
-                    return square[0][0] ? square.property('__data__').ZSCORE : Number.NEGATIVE_INFINITY;
+                    return square[0][0] ? square.property('__data__').ZSCORE : (-Math.pow(2, 32)).toString();
                 }
 
                 function isSorted(arr) {
                     return arr.every(function(d, i) {
-                        return i === arr.length - 1 || arr[i][1] >= arr[i + 1][1];
+                        if (i === arr.length - 1) {
+                            return true;
+                        } 
+                        var diff = arr[i][1] - arr[i + 1][1];
+                        return isNaN(diff) ? (arr[i][1].localeCompare(arr[i + 1][1]) <= 0) : diff >= 0;
                     });
                 }
 
@@ -3225,8 +3293,8 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .on('click', function() {
                         var rowValues = statistics.map(function(d) { return d[ranking]; })
                             .map(function(significanceValue, idx) {
-                                return [idx, getInternalSortValue(significanceValue)];
-                            });
+                            return [idx, getInternalSortValue(significanceValue)];
+                        });
 
                         if (isSorted(rowValues)) {
                             rowValues.sort(function(a, b) { return a[1] - b[1]; });
@@ -3289,24 +3357,21 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('height', gridFieldHeight);
 
                 var colName = colNameItems.selectAll('.colname')
-                    .data(colNames.map(function(colName, i) {
-                        return { colName: colName, patientID: patientIDs[i] };
-                    }), function(d) { return d.colName; });
+                    .data(colNames, function(d) { return d; });
 
                 colName.enter()
                     .append('text')
                     .attr('class', function(d) {
-                        return 'colname colname-' + smartRUtils.makeSafeForCSS(d.colName) +
-                            ' patientID-' + smartRUtils.makeSafeForCSS(d.patientID);
+                        return 'colname colname-' + smartRUtils.makeSafeForCSS(d);
                     })
                     .style('text-anchor', 'start')
-                    .text(function(d) { return d.colName; });
+                    .text(function(d) { return d; });
 
                 colName.transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
                     .style('font-size', gridFieldHeight + 'px')
                     .attr('transform', function(d) {
-                        return 'translate(' + (colNames.indexOf(d.colName) * gridFieldWidth) + ',0)' +
+                        return 'translate(' + (colNames.indexOf(d) * gridFieldWidth) + ',0)' +
                             'translate(' + (gridFieldWidth / 2) + ',' + (-4 - gridFieldHeight * 2) + ')rotate(-45)';
                     });
 
@@ -3344,7 +3409,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('y', function(d) { return rowNames.indexOf(d) * gridFieldHeight + 0.5 * gridFieldHeight; });
 
                 var bar = barItems.selectAll('.bar')
-                    .data(statistics, function(d, i) { return i; });
+                    .data(statistics, function(d) { return d.ROWNAME; });
 
                 bar.enter()
                     .append('rect')
@@ -3372,8 +3437,8 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
                     .attr('width', function(d) { return histogramScale(d[ranking]); })
                     .attr('height', gridFieldHeight)
-                    .attr('x', function(d) { return -histogramScale(d[ranking]); })
                     .attr('y', function(d) { return gridFieldHeight * rowNames.indexOf(d.ROWNAME); })
+                    .attr('x', function(d) { return -histogramScale(d[ranking]); })
                     .style('fill', function(d) { return d[ranking] > 0 ? '#990000' : 'steelblue'; });
 
                 var featurePosY = -gridFieldWidth * 2 - longestColNameLength + 20;
@@ -3384,15 +3449,14 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 extraSquare.enter()
                     .append('rect')
                     .attr('class', function(d) {
-                        return 'extraSquare patientID-' + smartRUtils.makeSafeForCSS(d.PATIENTID) +
+                        return 'extraSquare colname-' + smartRUtils.makeSafeForCSS(d.COLNAME) +
                             ' rowname-' + smartRUtils.makeSafeForCSS(d.ROWNAME);
                     })
                     .on('mouseover', function(d) {
-                        d3.select('.colname.patientID-' + smartRUtils.makeSafeForCSS(d.PATIENTID)).classed('highlight', true);
+                        d3.select('.colname.colname-' + smartRUtils.makeSafeForCSS(d.COLNAME)).classed('highlight', true);
                         d3.select('.feature.feature-' + smartRUtils.makeSafeForCSS(d.ROWNAME)).classed('highlight', true);
                         var html = 'Value: ' + d.VALUE + '<br/>' +
                             (d.ZSCORE ? 'z-Score: ' + d.ZSCORE + '<br/>' : '') +
-                            'Column: ' + d.COLNAME + '<br/>' +
                             'Row: ' + d.ROWNAME + '<br/>' +
                             'PatientId: ' + d.PATIENTID + '<br/>' +
                             'Type: ' + d.TYPE + '<br/>' +
@@ -3408,7 +3472,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
 
                 extraSquare.transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
-                    .attr('x', function(d) { return patientIDs.indexOf(d.PATIENTID) * gridFieldWidth; })
+                    .attr('x', function(d) { return colNames.indexOf(d.COLNAME) * gridFieldWidth; })
                     .attr('y', function(d) { return featurePosY - features.indexOf(d.ROWNAME) * gridFieldHeight; })
                     .attr('width', gridFieldWidth)
                     .attr('height', gridFieldHeight);
@@ -3421,9 +3485,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('class', function(d) { return 'feature feature-' + smartRUtils.makeSafeForCSS(d); })
                     .attr('dy', '0.35em')
                     .style('text-anchor', 'start')
-                    .text(function(d) {
-                        return d === 'Cohort' ? d : smartRUtils.shortenConcept(d);
-                    });
+                    .text(function(d) { return d; });
 
                 feature.transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
@@ -3456,9 +3518,9 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .append('rect')
                     .attr('class', 'box featureSortBox')
                     .on('click', function(feature) {
-                        var featureValues = patientIDs.map(function(patientID, idx) {
+                        var featureValues = colNames.map(function(colName, idx) {
                             var css = 'extraSquare rowname-' + smartRUtils.makeSafeForCSS(feature) +
-                                ' patientID-' + smartRUtils.makeSafeForCSS(patientID);
+                                ' colname-' + smartRUtils.makeSafeForCSS(colName);
                             var elements = document.getElementsByClassName(css);
                             var value = (-Math.pow(2, 32)).toString(); // if square does not exist
                             if (elements.length > 0) {
@@ -3470,12 +3532,12 @@ angular.module('smartRApp').directive('heatmapPlot', [
                         if (isSorted(featureValues)) {
                             featureValues.sort(function(a, b) {
                                 var diff = a[1] - b[1];
-                                return isNaN(diff) ? a[1].localeCompare(b[1]) : diff;
+                                return isNaN(diff) ? b[1].localeCompare(a[1]) : diff;
                             });
                         } else {
                             featureValues.sort(function(a, b) {
                                 var diff = b[1] - a[1];
-                                return isNaN(diff) ? b[1].localeCompare(a[1]) : diff;
+                                return isNaN(diff) ? a[1].localeCompare(b[1]) : diff;
                             });
                         }
                         var sortValues = featureValues.map(function(featureValue) {
@@ -3569,37 +3631,30 @@ angular.module('smartRApp').directive('heatmapPlot', [
                 adjustDimensions();
             }
 
-            var cutoffLevel = 0;
-
+            var selectedRownames = [];
             function animateCutoff(cutoff) {
+                selectedRownames = [];
                 cutoff = Math.floor(cutoff);
-                cutoffLevel = cutoff;
                 d3.selectAll('.square')
-                    .classed('cuttoffHighlight', false);
+                    .classed('cutoffHighlight', false);
                 d3.selectAll('.bar')
-                    .classed('cuttoffHighlight', false);
-                statistics.map(function(d) { return d[ranking]; })
-                    .sort(function(a, b) { return a - b; })
+                    .classed('cutoffHighlight', false);
+                statistics.slice().sort(function(a, b) { return getInternalSortValue(a[ranking]) - getInternalSortValue(b[ranking]); })
                     .filter(function(d, i) { return i < cutoff; })
-                    .forEach(function(d) {
-                        d3.select('.bar.idx-' + smartRUtils.makeSafeForCSS(d[0])).classed('cuttoffHighlight', true);
-                        d3.selectAll('.square.rowname-' + smartRUtils.makeSafeForCSS(rowNames[d[0]])).classed('cuttoffHighlight', true);
+                    .forEach(function(d, i) {
+                        selectedRownames.push(d.ROWNAME);
+                        d3.select('.bar.idx-' + i).classed('cutoffHighlight', true);
+                        d3.selectAll('.square.rowname-' + smartRUtils.makeSafeForCSS(d.ROWNAME)).classed('cutoffHighlight', true);
                     });
             }
 
             function cutoff() {
-                //HeatmapService.startScriptExecution({
-                //    taskType: 'run',
-                //    arguments: params,
-                //    onUltimateSuccess: HeatmapService.runAnalysisSuccess,
-                //    onUltimateFailure: HeatmapService.runAnalysisFailed,
-                //    phase: 'run',
-                //    progressMessage: 'Calculating',
-                //    successMessage: undefined
-                //});
-                // TODO: Use ajax service to be provided by ajaxServices.js to re-compute analysis
-                // with new arguments (in this case filter for cut-off)
-                scope.params.max_row = maxRows - cutoffLevel - 1;
+                // if no rownames selected we reset the model
+                if (selectedRownames.length === 0) {
+                    scope.params.selections.selectedRownames = [];
+                }
+                scope.params.selections.selectedRownames = JSON.parse(JSON.stringify(scope.params.selections.selectedRownames))
+                    .concat(selectedRownames);
                 $('run-button input').click();
             }
 
@@ -3695,7 +3750,7 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('fill', function(d) {
                         return colorScale(1 / (1 + Math.pow(Math.E, -d.ZSCORE)));
                     });
-
+                    
                 d3.selectAll('.legendColor')
                     .transition()
                     .duration(animationCheck.checked ? ANIMATION_DURATION : 0)
@@ -3720,8 +3775,10 @@ angular.module('smartRApp').directive('heatmapPlot', [
                                 case 'subset':
                                     return featureColorSetBinary[d.VALUE - 1];
                                 case 'numeric':
-                                    colorScale.range(featureColorSetSequential);
-                                    return colorScale(1 / (1 + Math.pow(Math.E, -d.ZSCORE)));
+                                    var scale = d3.scale.quantile()
+                                        .domain([0, 1])
+                                        .range(featureColorSetSequential);
+                                    return scale(1 / (1 + Math.pow(Math.E, -d.ZSCORE)));
                                 default:
                                     return featureColorCategorical(d.VALUE);
                             }
@@ -3804,17 +3861,17 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('transform', function(d) {
                         return 'translate(' + d.x + ',' + (-spacing - w + d.y) + ')';
                     }).on('click', function(d) {
-                    var previousSelection = selectedColNames.slice();
-                    unselectAll();
-                    var leafs = d.index.split(' ');
-                    for (var i = 0; i < leafs.length; i++) {
-                        var colName = colNames[leafs[i]];
-                        selectCol(colName);
-                    }
-                    if (previousSelection.sort().toString() === selectedColNames.sort().toString()) {
+                        var previousSelection = selectedColNames.slice();
                         unselectAll();
-                    }
-                })
+                        var leafs = d.index.split(' ');
+                        for (var i = 0; i < leafs.length; i++) {
+                            var colName = colNames[leafs[i]];
+                            selectCol(colName);
+                        }
+                        if (previousSelection.sort().toString() === selectedColNames.sort().toString()) {
+                            unselectAll();
+                        }
+                    })
                     .on('mouseover', function(d) {
                         tip.show('Height: ' + d.height);
                     })
@@ -3860,15 +3917,14 @@ angular.module('smartRApp').directive('heatmapPlot', [
                     .attr('transform', function(d) {
                         return 'translate(' + (width + spacing + h - d.y) + ',' + d.x + ')';
                     }).on('click', function(d) {
-                    var leafs = d.index.split(' ');
-                    var genes = [];
-                    leafs.forEach(function(leaf) {
-                        var rowName = rowNames[leaf];
-                        var split = rowName.split("--");
-                        split.shift();
-                        genes = genes.concat(split);
-                    });
-                    var baseURL = EndpointService.getMasterEndpoint().url;
+                        var leafs = d.index.split(' ');
+                        var genes = [];
+                        leafs.forEach(function(leaf) {
+                            var rowName = rowNames[leaf];
+                            var split = rowName.split("--");
+                            split.shift();
+                            genes = genes.concat(split);
+                        });
 
                     var request = $.ajax({
                         url: baseURL + '/SmartR/biocompendium',
@@ -3879,17 +3935,17 @@ angular.module('smartRApp').directive('heatmapPlot', [
                         }
                     });
 
-                    request.then(
-                        function(response) {
-                            var sessionID = response.match(/tmp_\d+/)[0];
-                            var url = 'http://biocompendium.embl.de/' +
-                                'cgi-bin/biocompendium.cgi?section=pathway&pos=0&background=whole_genome&session=' +
-                                sessionID + '&list=gene_list_1__1&list_size=15&org=human';
-                            window.open(url);
-                        },
-                        function(response) { alert("Error:", response); }
-                    );
-                })
+                        request.then(
+                            function(response) {
+                                var sessionID = response.match(/tmp_\d+/)[0];
+                                var url = 'http://biocompendium.embl.de/' +
+                                    'cgi-bin/biocompendium.cgi?section=pathway&pos=0&background=whole_genome&session=' +
+                                    sessionID + '&list=gene_list_1__1&list_size=15&org=human';
+                                window.open(url);
+                            },
+                            function(response) { alert("Error:", response); }
+                        );
+                    })
                     .on('mouseover', function(d) {
                         tip.show('Height: ' + d.height);
                     })
@@ -3912,13 +3968,10 @@ angular.module('smartRApp').directive('heatmapPlot', [
             function updateColOrder(sortValues, update) {
                 update = typeof update === 'undefined' ? true : update;
                 var newColnames = [];
-                var newPatientIDs = [];
                 sortValues.forEach(function(sortValue) {
                     newColnames.push(colNames[sortValue]);
-                    newPatientIDs.push(patientIDs[sortValue]);
                 });
                 colNames = newColnames;
-                patientIDs = newPatientIDs;
                 unselectAll();
                 removeColDendrogram();
                 if (update) {
@@ -5129,8 +5182,8 @@ angular.module('smartRApp').directive('volcanoPlot', [
             link: function (scope, element) {
 
                 /**
-                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
-                 */
+            * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
+            */
                 scope.$watch('data', function() {
                     $(element[0]).empty();
                     if (!$.isEmptyObject(scope.data)) {
@@ -5177,8 +5230,10 @@ angular.module('smartRApp').directive('volcanoPlot', [
 
             volcanoplot.call(tip);
 
+            var maxAbsLogFCs = Math.max.apply(null, logFCs.map(Math.abs))
+
             var x = d3.scale.linear()
-                .domain([-Math.max.apply(null, logFCs), Math.max.apply(null, logFCs)])
+                .domain([-maxAbsLogFCs, maxAbsLogFCs])
                 .range([0, width]);
 
             var y = d3.scale.linear()
@@ -5206,21 +5261,21 @@ angular.module('smartRApp').directive('volcanoPlot', [
                 .attr('class', 'x axis')
                 .attr('transform', 'translate(0, 0)')
                 .call(d3.svg.axis()
-                    .scale(x)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(height)
-                    .orient('bottom'));
+                .scale(x)
+                .ticks(10)
+                .tickFormat('')
+                .innerTickSize(height)
+                .orient('bottom'));
 
             volcanoplot.append('g')
                 .attr('class', 'y axis')
                 .attr('transform', 'translate(' + width + ',' + 0 + ')')
                 .call(d3.svg.axis()
-                    .scale(y)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(width)
-                    .orient('left'));
+                .scale(y)
+                .ticks(10)
+                .tickFormat('')
+                .innerTickSize(width)
+                .orient('left'));
 
             volcanoplot.append('text')
                 .attr('class', 'text axisText')
@@ -5262,7 +5317,7 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return getColor(d);
                     });
 
-                drawVolcanotable(getTopRankedPoints().data());
+                    drawVolcanotable(getTopRankedPoints().data());
             }
 
             var pDrag = d3.behavior.drag()
@@ -5330,7 +5385,7 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return getColor(d);
                     });
 
-                drawVolcanotable(getTopRankedPoints().data());
+                    drawVolcanotable(getTopRankedPoints().data());
             }
 
             var lFCDrag = d3.behavior.drag()
@@ -5430,24 +5485,24 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return d;
                     });
 
-                var rows = tbody.selectAll('tr')
-                    .data(points)
-                    .enter()
-                    .append('tr')
-                    .attr('class', 'mytr');
+                    var rows = tbody.selectAll('tr')
+                        .data(points)
+                        .enter()
+                        .append('tr')
+                        .attr('class', 'mytr');
 
-                rows.selectAll('td')
-                    .data(function (row) {
-                        return columns.map(function (column) {
-                            return {column: column, value: row[column]};
+                    rows.selectAll('td')
+                        .data(function (row) {
+                            return columns.map(function (column) {
+                                return {column: column, value: row[column]};
+                            });
+                        })
+                        .enter()
+                        .append('td')
+                        .attr('class', 'text mytd')
+                        .text(function (d) {
+                            return d.value;
                         });
-                    })
-                    .enter()
-                    .append('td')
-                    .attr('class', 'text mytd')
-                    .text(function (d) {
-                        return d.value;
-                    });
             }
 
             function updateVolcano() {
@@ -5456,34 +5511,34 @@ angular.module('smartRApp').directive('volcanoPlot', [
                         return d.uid;
                     });
 
-                point.enter()
-                    .append('rect')
-                    .attr('class', function(d) { return 'point uid-' + smartRUtils.makeSafeForCSS(d.uid); })
-                    .attr('x', function (d) {
-                        return x(d.logFC) - 2;
-                    })
-                    .attr('y', function (d) {
-                        return y(d.negativeLog10PValues) - 2;
-                    })
-                    .attr('width', 4)
-                    .attr('height', 4)
-                    .style('fill', function (d) {
-                        return getColor(d);
-                    })
-                    .on('mouseover', function (d) {
-                        var html = 'ID: ' + d.uid + '<br/>' +
-                            'p-value: ' + d.pValue + '<br/>' +
-                            '-log10 p: ' + d.negativeLog10PValues + '<br/>' +
-                            'log2FC: ' + d.logFC;
-                        tip.show(html);
-                    })
-                    .on('mouseout', function () {
-                        tip.hide();
-                    });
+                    point.enter()
+                        .append('rect')
+                        .attr('class', function(d) { return 'point uid-' + smartRUtils.makeSafeForCSS(d.uid); })
+                        .attr('x', function (d) {
+                            return x(d.logFC) - 2;
+                        })
+                        .attr('y', function (d) {
+                            return y(d.negativeLog10PValues) - 2;
+                        })
+                        .attr('width', 4)
+                        .attr('height', 4)
+                        .style('fill', function (d) {
+                            return getColor(d);
+                        })
+                        .on('mouseover', function (d) {
+                            var html = 'ID: ' + d.uid + '<br/>' +
+                                'p-value: ' + d.pValue + '<br/>' +
+                                '-log10 p: ' + d.negativeLog10PValues + '<br/>' +
+                                'log2FC: ' + d.logFC;
+                            tip.show(html);
+                        })
+                        .on('mouseout', function () {
+                            tip.hide();
+                        });
 
-                point.exit()
-                    .attr('r', 0)
-                    .remove();
+                        point.exit()
+                            .attr('r', 0)
+                            .remove();
             }
 
             updateVolcano();
