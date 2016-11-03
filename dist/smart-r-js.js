@@ -29,10 +29,10 @@ angular.module('smartRApp', [ 'transmartBaseUiConstants', 'tmEndpoints'])
 
 angular.module('smartRApp').run(['$templateCache', function($templateCache) {$templateCache.put('src/containers/boxplot/boxplot.content.html','<div class="main-container">\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="1" max="1" label="Numerical Variable" tooltip="Select a single numerical variable that you would like to have displayed.">\n            </concept-box>\n            <!----Nice idea but somehow lost it\'s initial purpose because cross-study support is gone.\n            Maybe implement later--->\n            <!----<concept-box style="display: inline-block;"--->\n                             <!----concept-group="fetch.conceptBoxes.subsets"--->\n                             <!----type="LD-categorical"--->\n                             <!----min="0"--->\n                             <!----max="-1"--->\n                             <!----label="(optional) Categorical Variables"--->\n                             <!----tooltip="Select an arbitrary amount of categorical variables to split the numerical variable into subsets.">--->\n            <!----</concept-box>--->\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1,2]">\n            </fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <br>\n            <br>\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="boxplot.svg" target="boxplot"></capture-plot-button>\n            <br>\n            <br>\n            <boxplot data="runAnalysis.scriptResults" width="1000" height="500"></boxplot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
 $templateCache.put('src/containers/boxplot/boxplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="40%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/heatmap/heatmap.content.html','<div ng-controller="HeatmapController" class="main-container">\n\n    <tab-container>\n        <!----========================================================================================================-->\n        <!---- Fetch Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional" tooltip="Select high dimensional data node(s) from the data tree and drag it into the box.\n                The nodes need to be from the same platform.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.numeric" type="LD-numerical" min="0" max="-1" label="(optional) Numerical Variables" tooltip="Select numeric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.categoric" type="LD-categorical" min="0" max="-1" label="(optional) Categoric Variables" tooltip="Select categoric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <biomarker-selection biomarkers="fetch.selectedBiomarkers"></biomarker-selection>\n            <hr class="sr-divider">\n            <fetch-button loaded="fetch.loaded" running="fetch.running" concept-map="fetch.conceptBoxes" biomarkers="fetch.selectedBiomarkers" show-summary-stats="true" summary-data="fetch.scriptResults" all-samples="common.totalSamples" allowed-cohorts="[1,2]" number-of-rows="common.numberOfRows" has-preprocess-tab="true">\n            </fetch-button>\n            <br>\n            <summary-stats summary-data="fetch.scriptResults"></summary-stats>\n        </workflow-tab>\n\n        <!----========================================================================================================-->\n        <!---- Preprocess Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Preprocess" disabled="preprocess.disabled">\n            <!----Aggregate Probes-->\n            <div class="heim-input-field">\n                <input type="checkbox" ng-model="preprocess.params.aggregate">\n                <span>Aggregate probes</span>\n            </div>\n\n            <hr class="sr-divider">\n\n            <preprocess-button params="preprocess.params" show-summary-stats="true" summary-data="preprocess.scriptResults" running="preprocess.running" all-samples="common.totalSamples" number-of-rows="common.numberOfRows">\n            </preprocess-button>\n\n            <br>\n            <summary-stats summary-data="preprocess.scriptResults"></summary-stats>\n        </workflow-tab>\n\n\n        <!----========================================================================================================-->\n        <!----Run Analysis-->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <!----Number of max row to display-->\n            <div class="heim-input-field heim-input-number sr-input-area">\n                Show <input type="text" id="txtMaxRow" ng-model="runAnalysis.params.max_row">\n                of {{ common.numberOfRows }} rows in total. ( less than 1000 is preferable. )\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <h2>Group columns by:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="nodes" checked="checked"> Node Order\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="subjects">\n                        Subject ID\n                    </label>\n                </fieldset>\n            </div>\n\n            <div class="heim-input-field sr-input-area">\n                <h2>I have read and accept the <a href="http://www.lifemapsc.com/genecards-suite-terms-of-use/" target="_blank">\n                    GeneCards TOU</a>\n                </h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="true"> yes (use GeneCards)\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="false" checked="checked"> no (use EMBL EBI)\n                    </label>\n                </fieldset>\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <sorting-criteria criteria="runAnalysis.params.ranking" samples="common.totalSamples" subsets="common.subsets">\n                </sorting-criteria>\n            </div>\n\n            <hr class="sr-divider">\n\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="heatmap.json" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="heatmap.svg" disabled="runAnalysis.download.disabled" target="heatmap-plot">\n            </capture-plot-button>\n            <download-results-button disabled="runAnalysis.download.disabled"></download-results-button>\n            <br>\n            <workflow-warnings warnings="runAnalysis.scriptResults.warnings"></workflow-warnings>\n            <heatmap-plot data="runAnalysis.scriptResults" width="1200" height="1200" params="runAnalysis.params">\n            </heatmap-plot>\n\n        </workflow-tab>\n\n    </tab-container>\n</div>\n');
-$templateCache.put('src/containers/heatmap/heatmap.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
 $templateCache.put('src/containers/correlation/correlation.content.html','<div ng-controller="CorrelationController" class="main-container">\n\n        <tab-container>\n\n            <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="2" max="2" label="Numerical Variables" tooltip="Select two numerical variables from the tree to compare them.">\n                </concept-box>\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.annotations" type="LD-categorical" min="0" max="-1" label="(optional) Categorical Variables" tooltip="Select an arbitrary amount of categorical variables from the tree to annotate the numerical datapoints.">\n                </concept-box>\n                <br>\n                <br>\n                <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1]">\n                </fetch-button>\n            </workflow-tab>\n\n            <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n                <div class="heim-input-field sr-input-area">\n                    <h2>Data transformation:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="raw" checked="checked"> Raw Values\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log2" checked="checked"> Log2\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log10" checked="checked"> Log10\n\n                        </label>\n                    </fieldset>\n                </div>\n                <div class="heim-input-field sr-input-area">\n                    <h2>Correlation computation method:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="pearson" checked="checked"> Pearson\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="kendall"> Kendall\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="spearman"> Spearman\n                        </label>\n                    </fieldset>\n                </div>\n                <hr class="sr-divider">\n                <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n                </run-button>\n                <capture-plot-button filename="correlation.svg" target="correlation-plot"></capture-plot-button>\n                <br>\n                <br>\n                <correlation-plot data="runAnalysis.scriptResults" width="1500" height="1500"></correlation-plot>\n            </workflow-tab>\n\n        </tab-container>\n\n    </div>\n\n\n');
 $templateCache.put('src/containers/correlation/correlation.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
+$templateCache.put('src/containers/heatmap/heatmap.content.html','<div ng-controller="HeatmapController" class="main-container">\n\n    <tab-container>\n        <!----========================================================================================================-->\n        <!---- Fetch Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional" tooltip="Select high dimensional data node(s) from the data tree and drag it into the box.\n                The nodes need to be from the same platform.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.numeric" type="LD-numerical" min="0" max="-1" label="(optional) Numerical Variables" tooltip="Select numeric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.categoric" type="LD-categorical" min="0" max="-1" label="(optional) Categoric Variables" tooltip="Select categoric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <biomarker-selection biomarkers="fetch.selectedBiomarkers"></biomarker-selection>\n            <hr class="sr-divider">\n            <fetch-button loaded="fetch.loaded" running="fetch.running" concept-map="fetch.conceptBoxes" biomarkers="fetch.selectedBiomarkers" show-summary-stats="true" summary-data="fetch.scriptResults" all-samples="common.totalSamples" allowed-cohorts="[1,2]" number-of-rows="common.numberOfRows" has-preprocess-tab="true">\n            </fetch-button>\n            <br>\n            <summary-stats summary-data="fetch.scriptResults"></summary-stats>\n        </workflow-tab>\n\n        <!----========================================================================================================-->\n        <!---- Preprocess Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Preprocess" disabled="preprocess.disabled">\n            <!----Aggregate Probes-->\n            <div class="heim-input-field">\n                <input type="checkbox" ng-model="preprocess.params.aggregate">\n                <span>Aggregate probes</span>\n            </div>\n\n            <hr class="sr-divider">\n\n            <preprocess-button params="preprocess.params" show-summary-stats="true" summary-data="preprocess.scriptResults" running="preprocess.running" all-samples="common.totalSamples" number-of-rows="common.numberOfRows">\n            </preprocess-button>\n\n            <br>\n            <summary-stats summary-data="preprocess.scriptResults"></summary-stats>\n        </workflow-tab>\n\n\n        <!----========================================================================================================-->\n        <!----Run Analysis-->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <!----Number of max row to display-->\n            <div class="heim-input-field heim-input-number sr-input-area">\n                Show <input type="text" id="txtMaxRow" ng-model="runAnalysis.params.max_row">\n                of {{ common.numberOfRows }} rows in total. ( less than 1000 is preferable. )\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <h2>Group columns by:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="nodes" checked="checked"> Node Order\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="subjects">\n                        Subject ID\n                    </label>\n                </fieldset>\n            </div>\n\n            <div class="heim-input-field sr-input-area">\n                <h2>I have read and accept the <a href="http://www.lifemapsc.com/genecards-suite-terms-of-use/" target="_blank">\n                    GeneCards TOU</a>\n                </h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="true"> yes (use GeneCards)\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="false" checked="checked"> no (use EMBL EBI)\n                    </label>\n                </fieldset>\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <sorting-criteria criteria="runAnalysis.params.ranking" samples="common.totalSamples" subsets="common.subsets">\n                </sorting-criteria>\n            </div>\n\n            <hr class="sr-divider">\n\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="heatmap.json" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="heatmap.svg" disabled="runAnalysis.download.disabled" target="heatmap-plot">\n            </capture-plot-button>\n            <download-results-button disabled="runAnalysis.download.disabled"></download-results-button>\n            <br>\n            <workflow-warnings warnings="runAnalysis.scriptResults.warnings"></workflow-warnings>\n            <heatmap-plot data="runAnalysis.scriptResults" width="1200" height="1200" params="runAnalysis.params">\n            </heatmap-plot>\n\n        </workflow-tab>\n\n    </tab-container>\n</div>\n');
+$templateCache.put('src/containers/heatmap/heatmap.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
 $templateCache.put('src/containers/templates/biomarkerSelection.html','<div class="sr-fetch-params-area">\n  <div class="heim-input-field heim-autocomplete">\n    <label for="heim-input-txt-identifier">Select a biomarker:</label>\n    <input id="heim-input-txt-identifier">\n    <span style="color: darkgrey"> Biomarker can be a gene, pathway, mirID or UniProtID.</span>\n    <div id="heim-input-list-identifiers">\n      <ul><li ng-repeat="biomarker in biomarkers">\n        <div>\n          <span class="identifier-type">{{biomarker.type}} </span>\n          <span class="identifier-name">{{biomarker.name}} </span>\n          <span class="identifier-synonyms">{{biomarker.synonyms}} </span>\n        </div>\n        <button class="identifier-delete" ng-click="removeIdentifier(biomarker)">&#x2716;</button>\n      </li></ul>\n    </div>\n  </div>\n</div>\n');
 $templateCache.put('src/containers/templates/boxplot.html','<workflow-controls ng-show="showControls">\n    <div>\n        <label for="sr-boxplot-log-check">Log2</label>\n        <input type="checkbox" id="sr-boxplot-log-check">\n    </div>\n    <div>\n        <label for="sr-boxplot-jitter-check">Jitter</label>\n        <input type="checkbox" id="sr-boxplot-jitter-check">\n    </div>\n    <div>\n        <label for="sr-boxplot-kde-check">KDE</label>\n        <input type="checkbox" id="sr-boxplot-kde-check">\n    </div>\n    <div>\n        <input type="button" id="sr-boxplot-reset-btn" value="Reset">\n    </div>\n    <div>\n        <input type="button" id="sr-boxplot-remove-btn" value="Remove Outliers">\n    </div>\n</workflow-controls>\n<div id="visualisation"></div>\n');
 $templateCache.put('src/containers/templates/conceptBox.html','<div class="heim-input-field heim-dropzone sr-hd-input" data-drop="true" ng-model="droppedNode" jqyoui-droppable="{multiple:true, onDrop:\'onNodeDropEvent(droppedNode)\'}">\n    <label style="display: inline">{{label}} <i class="ui-icon ui-icon-info sr-tooltip-dialog" title="{{tooltip}}"> </i></label>\n    <br><br>\n    <span ng-show="instructionMinNodes" class="sr-instruction">Drag at least {{min}} node(s) into the box<br></span>\n    <span ng-show="instructionMaxNodes" class="sr-instruction">Select at most {{max}} node(s)<br></span>\n    <span ng-show="instructionNodeType" class="sr-instruction">Node(s) do not have the correct type<br></span>\n    <span ng-show="instructionNodePlatform" class="sr-instruction">Nodes must have the same platform</span>\n    <div class="sr-drop-input" ng-class="{true:\'sr-drop-input-valid\', false:\'sr-drop-input-invalid\'}[conceptGroup.valid]" style="overflow-y:auto">\n        <ul>\n            <li ng-repeat="node in conceptGroup.concepts"> {{node.title}}</li>\n        </ul>\n    </div>\n\n\n    <div style="margin-top: 10px; text-align: right">\n        <input type="button" value="Clear Window" class="sr-drop-btn">\n    </div>\n</div>\n');
@@ -322,6 +322,921 @@ angular.module('smartRApp').controller('VolcanoplotController', [
 
     }]);
 
+
+//# sourceURL=biomarkerSelection.js
+
+'use strict';
+
+angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','EndpointService', '$http',
+    function($rootScope, EndpointService, $http) {
+
+    return {
+        restrict: 'E',
+        scope: {
+            biomarkers: '='
+        },
+        templateUrl:  'src/containers/templates/biomarkerSelection.html',
+        controller: ["$scope", function ($scope) {
+            if (!$scope.biomarkers) {
+                $scope.biomarkers = [];
+            }
+
+            var input = $('#heim-input-txt-identifier');
+            input.autocomplete({
+                source: function(request, response) {
+                    var term = request.term;
+                    if (term.length < 2) {
+                        return function() {
+                            return response({rows: []});
+                        };
+                    }
+                    return getIdentifierSuggestions(
+                        term,
+                        function(grailsResponse) {
+                            // convert Grails response to what jqueryui expects
+                            // grails response looks like this:
+                            // { "id": 1842083, "source": "", "keyword": "TPO", "synonyms":
+                            // "(TDH2A, MSA, TPX)", "category": "GENE", "display": "Gene" }
+                            var r = grailsResponse.rows.map(function(v) {
+                                return {
+                                    label: v.keyword,
+                                    value: v
+                                }
+                            });
+                            return response(r);
+                        }
+                    );
+                },
+                minLength: 2
+            });
+            input.data('ui-autocomplete')._renderItem = function(ul, item) {
+                var value = item.value;
+                return jQuery('<li class="ui-menu-item" role="presentation">' +
+                    '<a class="ui-corner-all">' +
+                    '<span class="category-gene">' + value.display + '&gt;</span>&nbsp;' +
+                    '<b>' + value.keyword + '</b>&nbsp;' + value.synonyms + '</a></li>').appendTo(ul);
+            };
+            input.on('autocompleteselect',
+                function(event, ui) {
+                    var v = ui.item.value;
+
+                    // check if the item is not in the list yet
+                    if ($scope.biomarkers.filter(function(b) {
+                                return b.id == v.id;
+                            }).length == 0) {
+
+                        // add the biomarker to the list
+                        $scope.biomarkers.push({
+                            id: v.id,
+                            type: v.display,
+                            name: v.keyword,
+                            synonyms: v.synonyms
+                        });
+                        $scope.$apply();
+                    }
+                    this.value = '';
+                    return false;
+                }
+            );
+            input.on('autocompletefocus',
+                function(event, ui) {
+                    var v = ui.item.value;
+                    this.value = v.display + ' ' + v.keyword;
+                    return false;
+                }
+            );
+
+            var getIdentifierSuggestions = (function() {
+                var baseURL = EndpointService.getMasterEndpoint().url;
+                var headers = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
+                var curXHR = null;
+
+                return function(term, response) {
+                    if (curXHR && curXHR.state() === 'pending') {
+                        curXHR.abort();
+                    }
+
+                    curXHR = $http({
+                        url: baseURL + "/search/loadSearchPathways?query=" + term,
+                        headers: headers
+                    });
+
+                    curXHR.always(function() { curXHR = null; })
+                    return curXHR.then(
+                        function(data) {
+                            data = data.substring(5, data.length - 1);  // loadSearchPathways returns String with null (JSON).
+                                                                        // This strips it off
+                            response(JSON.parse(data));
+                        },
+                        function() {
+                            response({rows: []}); // response must be called even on failure
+                        }
+                    );
+                };
+            })();
+
+            $scope.removeIdentifier = function(item) {
+                var index = $scope.biomarkers.indexOf(item);
+                if (index >= 0) {
+                    $scope.biomarkers.splice(index, 1);
+                }
+            }
+
+        }]
+
+    };
+}]);
+
+//# sourceURL=capturePlotButton.js
+
+'use strict';
+
+angular.module('smartRApp').directive('capturePlotButton', [function() {
+
+    // aux for downloadSVG
+    var copyWithCollapsedCSS = function(svgElement) {
+        var relevantProperties = [
+            'fill-opacity', 'fill', 'stroke', 'font-size', 'font-family', 'font-weight',
+            'shape-rendering', 'stroke-width', 'opacity', 'text-anchor'
+        ];
+        var clonedSvg = jQuery(svgElement).clone().attr('display', 'none');
+        clonedSvg.insertAfter(svgElement);
+
+        var cachedDefaults = {};
+        var scratchSvg = jQuery(document.createElement('svg'))
+            .attr('display', 'none')
+            .appendTo(jQuery('body'));
+
+        function getDefaultsForElement(jqElement) {
+            var nodeName = jqElement.prop('nodeName');
+            if (!cachedDefaults[nodeName]) {
+                var newElement = jQuery(document.createElement(nodeName))
+                    .appendTo(scratchSvg);
+
+                cachedDefaults[nodeName] = window.getComputedStyle(newElement[0]);
+            }
+            return cachedDefaults[nodeName];
+        }
+
+        clonedSvg.find('*').each(function(idx, element) { // for each element in <svg>
+            var computedStyle = window.getComputedStyle(element);
+
+            var jqElem = jQuery(element);
+            relevantProperties.forEach(function(property) { // for each property
+                var effectiveStyle = computedStyle.getPropertyValue(property);
+                var defaultStyle = getDefaultsForElement(jqElem).getPropertyValue(property);
+
+                if (effectiveStyle !== defaultStyle) {
+                    jqElem.attr(property, effectiveStyle);
+                }
+            });
+        });
+
+        scratchSvg.remove();
+
+        return clonedSvg;
+    };
+
+    var downloadSVG = function(svgElement, fileName) {
+        var serializer = new XMLSerializer();
+        var clonedSvg = copyWithCollapsedCSS(svgElement);
+        var xmlString = serializer.serializeToString(clonedSvg[0]);
+        var blob = new Blob([xmlString], { type: 'image/svg+xml' });
+        var svgBlobUrl = URL.createObjectURL(blob);
+        var link = jQuery('<a/>')
+            .attr('href', svgBlobUrl)
+            .attr('download', fileName)
+            .css('display', 'none');
+        jQuery('body').append(link);
+        link[0].click();
+        link.remove();
+        URL.revokeObjectURL(svgBlobUrl);
+        clonedSvg.remove();
+    };
+
+    return {
+        restrict: 'E',
+        scope: {
+            disabled: '=?',
+            filename: '@',
+            target: '@'
+        },
+        template:
+            '<input type="button" value="Capture" class="heim-action-button" ng-click="capture()">',
+        link: function(scope, elements) {
+
+            var template_btn = elements.children()[0];
+            template_btn.disabled = scope.disabled;
+
+            scope.$watch('disabled', function (newValue) {
+                template_btn.disabled = newValue;
+            }, true);
+
+            if (!scope.filename) {
+                // default filename
+                scope.filename = 'image.svg';
+            }
+
+            scope.capture = function() {
+                var svgElement = $(scope.target + ' svg')[0];
+                if (!svgElement) {
+                    return;
+                }
+                downloadSVG(svgElement, scope.filename);
+            };
+
+        }
+    };
+}]);
+
+//# sourceURL=cohortSummaryInfo.js
+
+'use strict';
+
+angular.module('smartRApp').directive('cohortSummaryInfo', [function() {
+
+    return {
+        restrict: 'E',
+        template: '<span id="sr-cohort-selection" style="font-size: 11px;"></span>',
+        controller: ["$scope", "$element", function($scope, $element) {
+            var span = $element.children()[0];
+
+            function _showCohortInfo() {
+                var cohortsSummary = '';
+
+                for(var i = 1; i <= GLOBAL.NumOfSubsets; i++) {
+                    var currentQuery = getQuerySummary(i);
+                    if(currentQuery !== '') {
+                        cohortsSummary += '<br/>Subset ' + (i) + ': <br/>';
+                        cohortsSummary += currentQuery;
+                        cohortsSummary += '<br/>';
+                    }
+                }
+                if (!cohortsSummary) {
+                    cohortsSummary = '<br/>WARNING: No subsets have been selected! Please go to the "Comparison" tab and select your subsets.';
+                }
+
+                span.innerHTML = cohortsSummary;
+            }
+
+            // Trigger for update is clicking the SmartR panel item. Maybe there is a more elegant way?
+            $scope.$evalAsync(function() {
+                _showCohortInfo(); // set it one time initially
+                $('#resultsTabPanel__smartRPanel').on('click', function() {
+                    _showCohortInfo();
+                });
+            });
+        }]
+    };
+
+}]);
+
+//# sourceURL=conceptBox.js
+
+'use strict';
+
+angular.module('smartRApp').directive('conceptBox', [
+    '$rootScope',
+    '$http',
+    'EndpointService',
+    function ($rootScope, $http, EndpointService) {
+        return {
+            restrict: 'E',
+            scope: {
+                conceptGroup: '=',
+                label: '@',
+                tooltip: '@',
+                min: '@',
+                max: '@',
+                type: '@'
+            },
+            templateUrl: 'src/containers/templates/conceptBox.html',
+            link: function (scope, element) {
+                var max = parseInt(scope.max);
+                var min = parseInt(scope.min);
+
+                var template_box = element[0].querySelector('.sr-drop-input'),
+                    template_btn = element[0].querySelector('.sr-drop-btn'),
+                    template_tooltip = element[0].querySelector('.sr-tooltip-dialog');
+
+                // instantiate tooltips
+                $(template_tooltip).tooltip({track: true, tooltipClass:"sr-ui-tooltip"});
+
+                var _clearWindow = function() {
+                    $(template_box).children().remove();
+                };
+
+                var _getConcepts = function() {
+                    return $(template_box).children().toArray().map(function(childNode) {
+                        return childNode.getAttribute('conceptid');
+                    });
+                };
+
+                // Avoid ExtJS lib
+                // =====================================================================
+                //var _activateDragAndDrop = function() {
+                //    var extObj = Ext.get(template_box);
+                //    var dtgI = new Ext.dd.DropTarget(extObj, {ddGroup: 'makeQuery'});
+                //    dtgI.notifyDrop = dropOntoCategorySelection; // jshint ignore:line
+                //};
+
+                var typeMap = {
+                    hleaficon: 'HD',
+                    alphaicon: 'LD-categorical',
+                    null: 'LD-categorical', // a fix for older tm version without alphaicon
+                    CATEGORICAL_OPTION: 'LD-categorical',
+                    valueicon: 'LD-numerical'
+                };
+                var _containsOnlyCorrectType = function() {
+                    return $(template_box).children().toArray().every(function(childNode) {
+                        return typeMap[childNode.getAttribute('setnodetype')] === scope.type;
+                    });
+                };
+
+                var _getNodeDetails = function (conceptKeys, callback) {
+                    var headers = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
+                    var request = $http({
+                        url: pageInfo.basePath + '/SmartR/nodeDetails',
+                        method: 'POST',
+                        config: {
+                            timeout: 10000
+                        },
+                        data: {
+                            conceptKeys: conceptKeys
+                        },
+                        headers: headers
+                    });
+
+                    request.then(
+                        callback,
+                        function() {
+                            alert('Could not fetch node details. Network connection lost?');
+                        });
+                };
+
+                // activate drag & drop for our conceptBox and color it once it is rendered
+                scope.$evalAsync(function() {
+                    //_activateDragAndDrop();
+                });
+
+                // bind the button to its clearing functionality
+                template_btn.addEventListener('click', function() {
+                    _clearWindow();
+                });
+
+                // this watches the childNodes of the conceptBox and updates the model on change
+                new MutationObserver(function() {
+                    scope.conceptGroup.concepts = _getConcepts(); // update the model
+                    scope.validate();
+                    scope.$apply();
+                }).observe(template_box, { childList: true });
+
+                scope.validate = function() {
+                    scope.instructionMinNodes = scope.conceptGroup.concepts.length < min;
+                    scope.instructionMaxNodes = max !== -1 && scope.conceptGroup.concepts.length > max;
+                    scope.instructionNodeType = !_containsOnlyCorrectType();
+                    // FIXME: Disabled for now because this causes problems with certain datasets for unknown reasons
+                    // if (scope.type === 'HD' && scope.conceptGroup.concepts.length > 1) {
+                    //     _getNodeDetails(scope.conceptGroup.concepts, function(response) {
+                    //         if (Object.keys(response.data).length < 2) {
+                    //             var platforms = response.data[Object.keys(response.data)[0]].platforms;
+                    //             scope.instructionNodePlatform = !platforms.every(function(el) { 
+                    //                 return el.title === platforms[0].title;
+                    //             });
+                    //         } else {
+                    //             scope.instructionNodePlatform = true;
+                    //         }
+                    //     });
+                    // } else {
+                    //     scope.instructionNodePlatform = false;
+                    // }
+                    scope.instructionNodePlatform = false;
+                };
+
+                scope.$watchGroup([
+                    'instructionNodeType',
+                    'instructionNodePlatform',
+                    'instructionMaxNodes',
+                    'instructionMinNodes'],
+                    function(newValue) {
+                        var instructionNodeType = newValue[0],
+                            instructionNodePlatform = newValue[1],
+                            instructionMaxNodes = newValue[2],
+                            instructionMinNodes = newValue[3];
+                        scope.conceptGroup.valid = !(instructionNodeType ||
+                                                     instructionNodePlatform ||
+                                                     instructionMaxNodes ||
+                                                     instructionMinNodes);
+                    });
+
+                scope.validate();
+            }
+        };
+    }]);
+
+//# sourceURL=downloadResultsButton.js
+
+angular.module('smartRApp').directive('downloadResultsButton', ['rServeService', function(rServeService)
+{
+    function downloadFile(data) {
+        var link = jQuery('<a/>')
+            .attr('href', rServeService.urlForFile(data.executionId, 'analysis_data.zip'))
+            .attr('download', 'analysis_data.zip')
+            .css('display', 'none');
+        jQuery('body').append(link);
+        link[0].click();
+        link.remove();
+    }
+
+    return {
+        restrict: 'E',
+        scope: {
+            disabled: '='
+        },
+        template:
+            '<input type="button" value="Download" class="heim-action-button">' +
+            '<span style="padding-left: 10px;"></span>',
+        link: function(scope, element) {
+
+            var template_btn = element.children()[0];
+            var template_msg = element.children()[1];
+
+            template_btn.disabled = scope.disabled;
+
+            scope.$watch('disabled', function (newValue) {
+                template_btn.disabled = newValue;
+            }, true);
+
+            template_btn.onclick = function() {
+
+                template_msg.innerHTML = 'Download data, please wait <span class="blink_me">_</span>';
+
+                rServeService.startScriptExecution({
+                    taskType: 'downloadData',
+                    arguments: {}
+                }).then(
+                    function (data){
+                        // download file
+                        template_msg.innerHTML = '';
+                        downloadFile(data);
+                    },
+                    function (msg){
+                        template_msg.innerHTML = 'Failure: ' + msg;
+                    }
+                )
+            };
+        }
+    };
+}]);
+
+//# sourceURL=fetchButton.js
+
+'use strict';
+
+angular.module('smartRApp').directive('fetchButton', [
+    '$rootScope',
+    'rServeService',
+    'smartRUtils',
+    function($rootScope, rServeService, smartRUtils) {
+        return {
+            restrict: 'E',
+            scope: {
+                conceptMap: '=',
+                loaded: '=?',
+                running: '=?',
+                biomarkers: '=?',
+                showSummaryStats: '=?',
+                summaryData: '=?',
+                allSamples: '=?',
+                numberOfRows: '=?',
+                allowedCohorts: '=',
+                projection: '@?',
+                hasPreprocessTab: '=?'
+            },
+            templateUrl: 'src/containers/templates/fetchButton.html',
+            link: function(scope, element) {
+                var template_btn = element.children()[0],
+                    template_msg = element.children()[1];
+
+                var _onSuccess = function() {
+                    if (scope.hasPreprocessTab) {
+                        template_msg.innerHTML = 'Task complete! Go to the "Preprocess" or "Run Analysis" tab to continue.';
+                    } else {
+                        template_msg.innerHTML = 'Task complete! Go to the "Run Analysis" tab to continue.';
+                    }
+                    scope.loaded = true;
+                    template_btn.disabled = false;
+                    scope.running = false;
+                };
+
+                var _onFailure = function(msg) {
+                    template_msg.innerHTML = 'Error: ' + msg;
+                    scope.loaded = false;
+                    template_btn.disabled = false;
+                    scope.running = false;
+                };
+
+                // we add this conditional $watch because there is some crazy promise resolving for allSamples
+                // going on. This is a workaround which observes allSamples and uses it as criteria for successful
+                // completion. FIXME
+                scope.$watch('summaryData', function(newValue) {
+                    if (scope.summaryData &&
+                            scope.showSummaryStats &&
+                            scope.running &&
+                            Object.keys(newValue).indexOf('subsets') !== -1) {
+                        scope.allSamples = newValue.allSamples;
+                        scope.numberOfRows = newValue.numberOfRows;
+                        _onSuccess();
+                    }
+                }, true);
+
+                var _getDataConstraints = function (biomarkers) {
+                    if (typeof biomarkers !== 'undefined' && biomarkers.length > 0) {
+                        var searchKeywordIds = biomarkers.map(function(biomarker) {
+                            return String(biomarker.id);
+                        });
+                        return {
+                            search_keyword_ids: {
+                                keyword_ids: searchKeywordIds
+                            }
+                        };
+                    }
+                };
+
+                var _showSummaryStats = function() {
+                    template_msg.innerHTML = 'Executing summary statistics, please wait <span class="blink_me">_</span>';
+                    rServeService.executeSummaryStats('fetch')
+                        .then(
+                            function(data) { scope.summaryData = data.result; }, // this will trigger $watch
+                            _onFailure
+                        );
+                };
+
+                template_btn.onclick = function() {
+                    template_btn.disabled = true;
+                    template_msg.innerHTML = 'Fetching data, please wait <span class="blink_me">_</span>';
+
+                    scope.summaryData = {};
+                    scope.allSamples = 0;
+                    scope.loaded = false;
+                    scope.running = true;
+                    var deleteReq = rServeService.deleteSessionFiles(); // cleanup our working directory
+                    var cohorts = smartRUtils.countCohorts();
+
+                    if (cohorts === 0) {
+                        _onFailure('No cohorts selected!');
+                        return;
+                    }
+
+                    if (scope.allowedCohorts.indexOf(cohorts) === -1) {
+                        _onFailure('This workflow requires ' + scope.allowedCohorts +
+                                   ' cohort(s), but you selected ' + cohorts);
+                        return;
+                    }
+
+                    for (var conceptGroup in scope.conceptMap) {
+                        if (scope.conceptMap.hasOwnProperty(conceptGroup) && !scope.conceptMap[conceptGroup].valid) {
+                            _onFailure('Your data do not match the requirements! All fields must be green.');
+                            return;
+                        }
+                    }
+
+                    var conceptKeys = smartRUtils.conceptBoxMapToConceptKeys(scope.conceptMap);
+                    if ($.isEmptyObject(conceptKeys)) {
+                        _onFailure('No concepts selected!');
+                        return;
+                    }
+
+                    var dataConstraints = _getDataConstraints(scope.biomarkers);
+
+                    deleteReq.then(
+                        rServeService.loadDataIntoSession(conceptKeys, dataConstraints, scope.projection).then(
+                            scope.showSummaryStats ? _showSummaryStats : _onSuccess,
+                            _onFailure
+                        ),
+                        _onFailure
+                    );
+
+
+            };
+        }
+    };
+    }]);
+
+//# sourceURL=ngTranscludeReplace.js
+
+'use strict';
+
+angular.module('smartRApp').directive('ngTranscludeReplace', ['$log', function ($log) {
+    return {
+        terminal: true,
+        restrict: 'EA',
+
+        link: function ($scope, $element, $attr, ctrl, transclude) {
+            if (!transclude) {
+                $log.error('orphan',
+                    'Illegal use of ngTranscludeReplace directive in the template! ' +
+                    'No parent directive that requires a transclusion found. ');
+                return;
+            }
+            transclude(function (clone) {
+                if (clone.length) {
+                    $element.replaceWith(clone);
+                }
+                else {
+                    $element.remove();
+                }
+            });
+        }
+    };
+}]);
+
+//# sourceURL=preprocessButton.js
+
+'use strict';
+
+angular.module('smartRApp').directive('preprocessButton', [
+    'rServeService',
+    '$rootScope',
+    function(rServeService, $rootScope) {
+        return {
+            restrict: 'E',
+            scope: {
+                running: '=?',
+                params: '=?',
+                showSummaryStats: '=',
+                summaryData: '=',
+                allSamples: '=?',
+                numberOfRows: '=?',
+                projection: '@?'
+            },
+            templateUrl:  'src/containers/templates/preprocessButton.html',
+            link: function(scope, element) {
+
+                var template_btn = element.children()[0];
+                var template_msg = element.children()[1];
+
+                var _onSuccess = function() {
+                    template_msg.innerHTML = 'Task complete! Go to the "Run Analysis" tab to continue.';
+                    template_btn.disabled = false;
+                    scope.running = false;
+                };
+
+                var _onFail = function(msg) {
+                    template_msg.innerHTML = 'Error: ' + msg;
+                    template_btn.disabled = false;
+                    scope.running = false;
+                };
+
+                // we add this conditional $watch because there is some crazy promise resolving for allSamples
+                // going on. This is a workaround which observes allSamples and uses it as criteria for successful
+                // completion. FIXME
+                scope.$watch('summaryData', function(newValue) {
+                    if (scope.summaryData &&
+                            scope.showSummaryStats &&
+                            scope.running &&
+                            Object.keys(newValue).indexOf('subsets') !== -1) {
+                        scope.allSamples = newValue.allSamples;
+                        scope.numberOfRows = newValue.numberOfRows;
+                        _onSuccess();
+                    }
+                }, true);
+
+                var _showSummaryStats = function() {
+                    template_msg.innerHTML = 'Execute summary statistics, please wait <span class="blink_me">_</span>';
+                    rServeService.executeSummaryStats('preprocess', scope.projection).then(
+                        function (data) {
+                            scope.summaryData = data.result; // this will trigger $watch
+                        },
+                        _onFail
+                    );
+                };
+
+                template_btn.onclick = function() {
+                    scope.summaryData = {};
+                    scope.disabled = true;
+                    scope.running = true;
+                    template_msg.innerHTML = 'Preprocessing, please wait <span class="blink_me">_</span>';
+
+                    var params = scope.params ? scope.params : {};
+                    rServeService.preprocess(params).then(
+                        scope.showSummaryStats ? _showSummaryStats : _onSuccess,
+                        _onFail
+                    );
+                };
+            }
+        };
+    }]);
+
+//# sourceURL=runButton.js
+
+'use strict';
+
+angular.module('smartRApp').directive('runButton', [
+    '$rootScope',
+    'rServeService',
+    'smartRUtils',
+    function($rootScope, rServeService, smartRUtils) {
+        return {
+            restrict: 'E',
+            scope: {
+                running: '=?',
+                storage: '=storeResultsIn',
+                script: '@scriptToRun',
+                name: '@buttonName',
+                filename: '@?',
+                params: '=?argumentsToUse',
+                waitMessage: '@?'
+            },
+            templateUrl:  'src/containers/templates/runButton.html',
+            link: function(scope, element) {
+                var params = scope.params ? scope.params : {};
+                if (!scope.waitMessage) {
+                    scope.waitMessage = 'Creating plot, please wait';
+                }
+
+                var template_btn = element.children()[0],
+                    template_msg = element.children()[1];
+
+                var _onSuccess = function(data) {
+                    scope.storage = data;
+                    template_msg.innerHTML = '';
+                    template_btn.disabled = false;
+                    scope.disabled = false;
+                    scope.running = false;
+                };
+
+                var _onFail = function(msg) {
+                    template_msg.innerHTML = 'Error: ' + msg;
+                    template_btn.disabled = false;
+                    scope.disabled = false;
+                    scope.running = false;
+                };
+
+                var _prepareResults = function(response) {
+                    if (scope.filename) {
+                        // when filename is specified it is assumed that results are serialized
+                        // if results are serialized, we need to deserialized them by
+                        // downloading the results files.
+                        rServeService.downloadJsonFile(response.executionId, scope.filename).then(
+                            function(d) { _onSuccess(d.data); },
+                            _onFail
+                        );
+                    } else {
+                        _onSuccess(JSON.parse(response.result.artifacts.value));
+                    }
+                };
+
+                template_btn.onclick = function() {
+                    smartRUtils.cleanUp();
+                    template_btn.disabled = true;
+                    scope.storage = {};
+                    scope.disabled = true;
+                    scope.running = true;
+                    template_msg.innerHTML = scope.waitMessage + ' <span class="blink_me">_</span>';
+
+                    rServeService.startScriptExecution({
+                        taskType: scope.script,
+                        arguments: params
+                    }).then(
+                        _prepareResults,
+                        _onFail
+                    );
+                };
+            }
+        };
+    }]);
+
+//# sourceURL=sortingCriteria.js
+
+'use strict';
+
+angular.module('smartRApp').directive('sortingCriteria', [
+    '$rootScope',
+    function($rootScope) {
+        return {
+            restrict: 'E',
+            scope: {
+                criteria : '=',
+                samples: '=',
+                subsets: '='
+            },
+            templateUrl:   'src/containers/templates/sortingCriteria.html'
+        };
+    }
+]);
+
+'use strict';
+
+angular.module('smartRApp').directive(['summaryStats',
+    '$rootScope',
+    function($rootScope) {
+        return {
+            restrict: 'E',
+            scope: {
+                summaryData: '='
+            },
+            templateUrl:   'src/containers/templates/summaryStatistics.html'
+        };
+    }
+]);
+
+//# sourceURL=tabContainer.js
+
+'use strict';
+
+angular.module('smartRApp').directive('tabContainer',
+    ['$rootScope', 'smartRUtils', '$timeout', function($rootScope, smartRUtils, $timeout) {
+        return {
+            restrict: 'E',
+            transclude: true,
+            templateUrl:  'src/containers/templates/tabContainer.html',
+            controller: ["$scope", function($scope) {
+                $scope.tabs = [];
+                this.addTab = function(tab) {
+                    $scope.tabs.push(tab);
+                };
+            }],
+            link: function() {
+                $timeout(function() { // init jQuery UI tabs after DOM has rendered
+                    $('#heim-tabs').tabs();
+                });
+            }
+        };
+    }]);
+
+//# sourceURL=workflowControls.js
+
+'use strict';
+
+angular.module('smartRApp').directive('workflowControls', [
+    '$rootScope',
+    'smartRUtils',
+    function($rootScope, smartRUtils) {
+        return {
+            restrict: 'E',
+            transclude: true,
+            templateUrl:  'src/containers/templates/workflowControls.html',
+            link: function(scope, element) {
+                var controls = element.children()[0];
+                var scrollbarWidth = smartRUtils.getScrollBarWidth();
+                controls.style.bottom = scrollbarWidth + 'px';
+                controls.style.right = scrollbarWidth + 'px';
+            }
+        };
+    }
+]);
+
+//# sourceURL=workflowTab.js
+
+'use strict';
+
+angular.module('smartRApp').directive('workflowTab', ['smartRUtils', function(smartRUtils) {
+    return {
+        restrict: 'E',
+        scope: {
+            name: '@tabName',
+            disabled: '='
+        },
+        require: '^tabContainer',
+        transclude: true,
+        template: '<ng-transclude-replace></ng-transclude-replace>',
+        link: function(scope, element, attrs, tabContainerCtrl) {
+            var id = 'fragment-' + smartRUtils.makeSafeForCSS(scope.name);
+            scope.id = id;
+            element[0].id = id;
+            tabContainerCtrl.addTab(scope);
+        }
+    };
+}]);
+
+//# sourceURL=workflowWarnings.js
+
+'use strict';
+
+angular.module('smartRApp').directive('workflowWarnings', [
+    '$rootScope',
+    function($rootScope) {
+        return {
+            restrict: 'E',
+            scope: {
+                warnings: '='
+            },
+            templateUrl:  'src/containers/templates/workflowWarnings.html',
+            link: function(scope) {
+                scope.$watch('warnings', function() {
+                    scope.visibility = $.isEmptyObject(scope.warnings) ? 'hidden' : 'visible';
+                    scope.text = '';
+                    for (var warn in scope.warnings) {
+                        if (scope.warnings.hasOwnProperty(warn)) {
+                            scope.text += scope.warnings[warn] + '\n';
+                        }
+                    }
+                }, true);
+            }
+        };
+    }
+]);
 
 //# sourceURL=commonWorkflowService.js
 
@@ -906,6 +1821,567 @@ angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService'
     return service;
 }]);
 
+
+'use strict';
+
+angular.module('smartRApp').controller('BoxplotController', [
+    '$scope',
+    'smartRUtils',
+    'commonWorkflowService',
+    function($scope, smartRUtils, commonWorkflowService) {
+
+        commonWorkflowService.initializeWorkflow('boxplot', $scope);
+
+        $scope.fetch = {
+            running: false,
+            disabled: false,
+            loaded: false,
+            conceptBoxes: {
+                datapoints: {concepts: [], valid: false}
+            }
+        };
+
+        $scope.runAnalysis = {
+            running: false,
+            disabled: true,
+            scriptResults: {},
+            params: {}
+        };
+
+        $scope.$watchGroup(['fetch.running', 'runAnalysis.running'],
+            function(newValues) {
+                var fetchRunning = newValues[0],
+                    runAnalysisRunning = newValues[1];
+
+                // clear old results
+                if (fetchRunning) {
+                    $scope.runAnalysis.scriptResults = {};
+                }
+
+                // disable tabs when certain criteria are not met
+                $scope.fetch.disabled = runAnalysisRunning;
+                $scope.runAnalysis.disabled = fetchRunning || !$scope.fetch.loaded;
+            }
+        );
+
+    }]);
+
+
+angular.module('smartRApp').directive('boxplot', [
+    'smartRUtils',
+    'rServeService',
+    '$rootScope',
+    function(smartRUtils, rServeService, $rootScope) {
+
+        return {
+            restrict: 'E',
+            scope: {
+                data: '=',
+                width: '@',
+                height: '@'
+            },
+            templateUrl:  'src/containers/templates/boxplot.html',
+            link: function (scope, element) {
+                var template_ctrl = element.children()[0],
+                    template_viz = element.children()[1];
+                /**
+                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
+                 */
+                scope.$watch('data', function () {
+                    $(template_viz).empty();
+                    if (! $.isEmptyObject(scope.data)) {
+                        smartRUtils.prepareWindowSize(scope.width, scope.height);
+                        scope.showControls = true;
+                        createBoxplot(scope, template_viz, template_ctrl);
+                    }
+                });
+            }
+        };
+
+        function createBoxplot(scope, root) {
+            var concept = '',
+                globalMin = Number.MIN_VALUE,
+                globalMax = Number.MAX_VALUE,
+                categories = [],
+                excludedPatientIDs = [],
+                useLog = false;
+            function setData(data) {
+                concept = data.concept[0];
+                globalMin = data.globalMin[0];
+                globalMax = data.globalMax[0];
+                categories = data['Subset 2'] ? ['Subset 1', 'Subset 2'] : ['Subset 1'];
+                excludedPatientIDs = data.excludedPatientIDs;
+                useLog = data.useLog[0];
+            }
+            setData(scope.data);
+
+            var removeBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-remove-btn');
+            removeBtn.addEventListener('click', removeOutliers);
+
+            var resetBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn');
+            resetBtn.addEventListener('click', reset);
+
+            var kdeCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-kde-check');
+            kdeCheck.addEventListener('change', function() { swapKDE(kdeCheck.checked); });
+            kdeCheck.checked = false;
+
+            var jitterCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-jitter-check');
+            jitterCheck.addEventListener('change', function() { swapJitter(jitterCheck.checked); });
+            jitterCheck.checked = false;
+
+            var logCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-log-check');
+            logCheck.checked = useLog;
+            logCheck.addEventListener('change', function() { swapLog(logCheck.checked); });
+
+            var animationDuration = 1000;
+
+            var width = parseInt(scope.width);
+            var height = parseInt(scope.height);
+            var margin = {top: 20, right: 60, bottom: 200, left: 280};
+
+            var boxWidth = 0.12 * width;
+            var whiskerLength = boxWidth / 6;
+
+            var colorScale = d3.scale.quantile()
+                .range(['rgb(158,1,66)', 'rgb(213,62,79)', 'rgb(244,109,67)', 'rgb(253,174,97)', 'rgb(254,224,139)', 'rgb(255,255,191)', 'rgb(230,245,152)', 'rgb(171,221,164)', 'rgb(102,194,165)', 'rgb(50,136,189)', 'rgb(94,79,162)']);
+
+            var boxplot = d3.select(root).append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+            var x = d3.scale.ordinal()
+                .domain(categories)
+                .rangeBands([0, width], 1, 0.5);
+
+            var y = d3.scale.linear()
+                .domain([globalMin, globalMax])
+                .range([height, 0]);
+
+            var yAxis = d3.svg.axis()
+                .scale(y)
+                .orient('left');
+
+            var xAxis = d3.svg.axis()
+                .scale(x)
+                .orient('bottom');
+
+            boxplot.append('g')
+                .attr('class', 'y axis')
+                .attr('transform', 'translate(' + 0 + ',' + 0 + ')')
+                .call(yAxis);
+
+            boxplot.append('g')
+                .attr('class', 'x axis')
+                .attr('transform', 'translate(' + 0 + ',' + (height + 20) + ')')
+                .call(xAxis)
+                .selectAll('text')
+                .attr('dy', '.35em')
+                .attr('transform', 'translate(' + 0 + ',' + 5 + ')rotate(45)')
+                .style('text-anchor', 'start');
+
+            boxplot.append('text')
+                .attr('transform', 'translate(' + (-40) + ',' + (height / 2) + ')rotate(-90)')
+                .attr('text-anchor', 'middle')
+                .text(smartRUtils.shortenConcept(concept) + (useLog ? ' (log2)' : ''));
+
+            var tip = d3.tip()
+                .attr('class', 'd3-tip')
+                .offset([-10, 0])
+                .html(function(d) { return d; });
+
+            boxplot.call(tip);
+
+            var brush = d3.svg.brush()
+                .x(d3.scale.identity().domain([0, width]))
+                .y(d3.scale.identity().domain([-5, height + 5]))
+                .on('brush', function () {
+                    contextMenu.hide();
+                    updateSelection();
+                });
+
+            boxplot.append('g')
+                .attr('class', 'brush')
+                .on('mousedown', function () {
+                    if (d3.event.button === 2) {
+                        d3.event.stopImmediatePropagation();
+                    }
+                })
+                .call(brush);
+
+            var contextMenu = d3.tip()
+                .attr('class', 'd3-tip sr-contextmenu')
+                .html(function(d) { return d; });
+
+            boxplot.call(contextMenu);
+
+            function _addEventListeners() {
+                smartRUtils.getElementWithoutEventListeners('sr-boxplot-exclude-btn').addEventListener('click', function() {
+                    contextMenu.hide();
+                    excludeSelection();
+                });
+
+                smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn-2').addEventListener('click', function() {
+                    contextMenu.hide();
+                    reset();
+                });
+            }
+
+            boxplot.on('contextmenu', function () {
+                d3.event.preventDefault();
+                contextMenu.show('<input id="sr-boxplot-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
+                    '<input id="sr-boxplot-reset-btn-2" value="Reset" class="sr-ctx-menu-btn">');
+                _addEventListeners();
+            });
+
+        var currentSelection;
+        function updateSelection() {
+            d3.selectAll('.point').classed('brushed', false);
+            var extent = brush.extent();
+            var left = extent[0][0],
+                top = extent[0][1],
+                right = extent[1][0],
+                bottom = extent[1][1];
+            currentSelection = d3.selectAll('.point')
+                .filter(function (d) {
+                    var point = d3.select(this);
+                    return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
+                })
+                .classed('brushed', true)
+                .data()
+                .map(function(d) { return d.patientID; });
+        }
+
+            function excludeSelection() {
+                excludedPatientIDs = excludedPatientIDs.concat(currentSelection);
+                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
+
+                rServeService.startScriptExecution({
+                    taskType: 'run',
+                    arguments: settings
+                }).then(
+                    function (response) {
+                        removePlot();
+                        scope.data = JSON.parse(response.result.artifacts.value);
+                    },
+                    function (response) {
+                        console.error(response);
+                    }
+                );
+            }
+
+            function removePlot() {
+                d3.select(root).selectAll('*').remove();
+                d3.selectAll('.d3-tip').remove();
+            }
+
+        function removeOutliers() {
+            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
+            if (currentSelection) { excludeSelection(); }
+        }
+
+            function kernelDensityEstimator(kernel, x) {
+                return function (sample) {
+                    return x.map(function (x) {
+                        return [x, d3.mean(sample, function (v) {
+                            return kernel(x - v);
+                        })];
+                    });
+                };
+            }
+
+            function epanechnikovKernel(scale) {
+                return function (u) {
+                    return Math.abs(u /= scale) <= 1 ? 0.75 * (1 - u * u) / scale : 0;
+                };
+            }
+
+            // function gaussKernel(scale) {
+            //     return function (u) {
+            //         return Math.exp(-u * u / 2) / Math.sqrt(2 * Math.PI) / scale;
+            //     };
+            // }
+
+            function swapKDE(checked) {
+                if (!checked) {
+                    d3.selectAll('.line').attr('visibility', 'hidden');
+                } else {
+                    d3.selectAll('.line').attr('visibility', 'visible');
+                }
+            }
+
+            function shortenNodeLabel(label) {
+                label = label.replace(/\W+/g, '');
+                return label;
+            }
+
+            var jitterWidth = 1.0;
+
+            function swapJitter() {
+                categories.forEach(function(category) {
+                    d3.selectAll('.point.' + smartRUtils.makeSafeForCSS(shortenNodeLabel(category)))
+                        .transition()
+                        .duration(animationDuration)
+                        .attr('cx', function(d) {
+                            return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
+                        });
+                });
+            }
+
+            function swapLog() {
+                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
+                rServeService.startScriptExecution({
+                    taskType: 'run',
+                    arguments: settings
+                }).then(
+                    function (response) {
+                        removePlot();
+                        scope.data = JSON.parse(response.result.artifacts.value);
+                    },
+                    function (response) {
+                        console.error(response);
+                    }
+                );
+            }
+
+            var boxes = {};
+            categories.forEach(function(category) {
+                boxes[category] = boxplot.append('g');
+                var params = scope.data[category];
+                createBox(params, category, boxes[category]);
+            });
+
+            function createBox(params, category, box) {
+                var boxLabel = shortenNodeLabel(category);
+                colorScale.domain(d3.extent(y.domain()));
+
+                var whisker = box.selectAll('.whisker')
+                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
+                        return boxLabel + '-whisker-' + i;
+                    });
+
+                whisker.enter()
+                    .append('line')
+                    .attr('class', 'whisker');
+
+                whisker.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x(category) - whiskerLength / 2)
+                    .attr('y1', function (d) { return y(d); })
+                    .attr('x2', x(category) + whiskerLength / 2)
+                    .attr('y2', function (d) { return y(d); });
+
+                var whiskerLabel = box.selectAll('.whiskerLabel')
+                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
+                        return boxLabel + '-whiskerLabel-' + i;
+                    });
+
+                whiskerLabel.enter()
+                    .append('text')
+                    .attr('class', 'whiskerLabel boxplotValue');
+
+                whiskerLabel.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) + whiskerLength / 2)
+                    .attr('y', function (d) { return y(d); })
+                    .attr('dx', '.35em')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'start')
+                    .text(function (d) { return d; });
+
+                var hingeLength = boxWidth;
+                var hinge = box.selectAll('.hinge')
+                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
+                        return boxLabel + '-hinge-' + i;
+                    });
+
+                hinge.enter()
+                    .append('line')
+                    .attr('class', 'hinge');
+
+                hinge.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x(category) - hingeLength / 2)
+                    .attr('y1', function (d) { return y(d); })
+                    .attr('x2', x(category) + hingeLength / 2)
+                    .attr('y2', function (d) { return y(d); });
+
+                var hingeLabel = box.selectAll('.hingeLabel')
+                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
+                        return boxLabel + '-hingeLabel-' + i;
+                    });
+
+                hingeLabel.enter()
+                    .append('text')
+                    .attr('class', 'hingeLabel boxplotValue');
+
+                hingeLabel.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) - hingeLength / 2)
+                    .attr('y', function (d) { return y(d); })
+                    .attr('dx', '-.35em')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'end')
+                    .text(function (d) { return d; });
+
+                var connection = box.selectAll('.connection')
+                    .data([[params.upperWhisker, params.upperHinge], [params.lowerWhisker, params.lowerHinge]],
+                        function (d, i) { return boxLabel + '-connection-' + i; });
+
+                connection.enter()
+                    .append('line')
+                    .attr('class', 'connection');
+
+                connection.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x(category))
+                    .attr('y1', function (d) { return y(d[0]); })
+                    .attr('x2', x(category))
+                    .attr('y2', function (d) { return y(d[1]); });
+
+                var upperBox = box.selectAll('.box.upper')
+                    .data(params.upperHinge, function (d) { return d; });
+
+                upperBox.enter()
+                    .append('rect')
+                    .attr('class', 'box upper');
+
+                upperBox.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) - hingeLength / 2)
+                    .attr('y', y(params.upperHinge))
+                    .attr('height', Math.abs(y(params.upperHinge) - y(params.median)))
+                    .attr('width', hingeLength);
+
+                var lowerBox = box.selectAll('.box.lower')
+                    .data(params.lowerHinge, function (d) { return d; });
+
+                lowerBox.enter()
+                    .append('rect')
+                    .attr('class', 'box lower');
+
+                lowerBox.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) - hingeLength / 2)
+                    .attr('y', y(params.median))
+                    .attr('height', Math.abs(y(params.median) - y(params.lowerHinge)))
+                    .attr('width', hingeLength);
+
+                var medianLabel = box.selectAll('.medianLabel')
+                    .data(params.median, function (d) { return d;});
+
+                medianLabel.enter()
+                    .append('text')
+                    .attr('class', 'medianLabel boxplotValue');
+
+                medianLabel.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) + hingeLength / 2)
+                    .attr('y', function () { return y(params.median); })
+                    .attr('dx', '.35em')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'start')
+                    .text(params.median);
+
+                var point = box.selectAll('.point')
+                    .data(params.rawData, function (d) { return boxLabel + '-' + d.patientID; });
+
+                point.enter()
+                    .append('circle')
+                    .attr('cx', function (d) {
+                        return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
+                    })
+                    .attr('r', 0)
+                    .attr('fill', function (d) { return colorScale(d.value); })
+                    .on('mouseover', function (d) {
+                        tip.show('Value: ' + d.value + '</br>' +
+                            'PatientID: ' + d.patientID + '</br>' +
+                            'Outlier: ' + d.outlier);
+                    })
+                    .on('mouseout', function () {
+                        tip.hide();
+                    });
+
+                point
+                    .attr('class', function (d) {
+                        return 'point patientID-' + smartRUtils.makeSafeForCSS(d.patientID) +
+                            (d.outlier ? ' outlier ' : ' ') + smartRUtils.makeSafeForCSS(boxLabel);
+                    }) // This is here and not in the .enter() because points might become outlier on removal of other points
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('cy', function (d) { return y(d.value); })
+                    .attr('r', 3);
+
+                point.exit()
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('r', 0)
+                    .remove();
+
+                var yCopy = y.copy();
+                yCopy.domain([params.lowerWhisker, params.upperWhisker]);
+                var kde = kernelDensityEstimator(epanechnikovKernel(6), yCopy.ticks(100));
+                var values = params.rawData.map(function (d) { return d.value; });
+                var estFun = kde(values);
+                var kdeDomain = d3.extent(estFun, function (d) { return d[1]; });
+                var kdeScale = d3.scale.linear()
+                    .domain(kdeDomain)
+                    .range([0, boxWidth / 2]);
+                var lineGen = d3.svg.line()
+                    .x(function (d) { return x(category) - kdeScale(d[1]); })
+                    .y(function (d) { return y(d[0]); });
+
+                box.append('path')
+                    .attr('class', 'line')
+                    .attr('visibility', 'hidden')
+                    .datum(estFun)
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('d', lineGen);
+            }
+
+            function removeBrush() {
+                d3.selectAll('.brush')
+                    .call(brush.clear());
+            }
+
+            function reset() {
+                removeBrush();
+                excludedPatientIDs = [];
+                currentSelection = [];
+                excludeSelection(); // Abusing the method because I can
+            }
+
+        }
+
+    }]);
+
+
+angular.module('smartRApp')
+    .config(["$stateProvider", function ($stateProvider) {
+        $stateProvider
+            .state('boxplot', {
+                parent: 'site',
+                url: '/boxplot',
+                views: {
+                    '@': {
+                        templateUrl: 'src/containers/boxplot/boxplot.html'
+                    },
+                    'content@boxplot': {
+                        templateUrl: 'src/containers/boxplot/boxplot.content.html',
+                        controller: 'BoxplotController',
+                        controllerAs: 'vm'
+                    },
+                    'sidebar@boxplot': {
+                        templateUrl: 'app/components/sidebar/sidebar.html',
+                        controller: 'SidebarCtrl',
+                        controllerAs: 'vm'
+                    }
+                }
+            });
+    }]);
+
 angular.module('smartRApp').directive('correlationPlot', [
     'smartRUtils',
     'rServeService',
@@ -1407,919 +2883,6 @@ angular.module('smartRApp')
                 }
             });
     }]);
-
-//# sourceURL=biomarkerSelection.js
-
-'use strict';
-
-angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','EndpointService', '$http',
-    function($rootScope, EndpointService, $http) {
-
-    return {
-        restrict: 'E',
-        scope: {
-            biomarkers: '='
-        },
-        templateUrl:  'src/containers/templates/biomarkerSelection.html',
-        controller: ["$scope", function ($scope) {
-            if (!$scope.biomarkers) {
-                $scope.biomarkers = [];
-            }
-
-            var input = $('#heim-input-txt-identifier');
-            input.autocomplete({
-                source: function(request, response) {
-                    var term = request.term;
-                    if (term.length < 2) {
-                        return function() {
-                            return response({rows: []});
-                        };
-                    }
-                    return getIdentifierSuggestions(
-                        term,
-                        function(grailsResponse) {
-                            // convert Grails response to what jqueryui expects
-                            // grails response looks like this:
-                            // { "id": 1842083, "source": "", "keyword": "TPO", "synonyms":
-                            // "(TDH2A, MSA, TPX)", "category": "GENE", "display": "Gene" }
-                            var r = grailsResponse.rows.map(function(v) {
-                                return {
-                                    label: v.keyword,
-                                    value: v
-                                }
-                            });
-                            return response(r);
-                        }
-                    );
-                },
-                minLength: 2
-            });
-            input.data('ui-autocomplete')._renderItem = function(ul, item) {
-                var value = item.value;
-                return jQuery('<li class="ui-menu-item" role="presentation">' +
-                    '<a class="ui-corner-all">' +
-                    '<span class="category-gene">' + value.display + '&gt;</span>&nbsp;' +
-                    '<b>' + value.keyword + '</b>&nbsp;' + value.synonyms + '</a></li>').appendTo(ul);
-            };
-            input.on('autocompleteselect',
-                function(event, ui) {
-                    var v = ui.item.value;
-
-                    // check if the item is not in the list yet
-                    if ($scope.biomarkers.filter(function(b) {
-                                return b.id == v.id;
-                            }).length == 0) {
-
-                        // add the biomarker to the list
-                        $scope.biomarkers.push({
-                            id: v.id,
-                            type: v.display,
-                            name: v.keyword,
-                            synonyms: v.synonyms
-                        });
-                        $scope.$apply();
-                    }
-                    this.value = '';
-                    return false;
-                }
-            );
-            input.on('autocompletefocus',
-                function(event, ui) {
-                    var v = ui.item.value;
-                    this.value = v.display + ' ' + v.keyword;
-                    return false;
-                }
-            );
-
-            var getIdentifierSuggestions = (function() {
-                var baseURL = EndpointService.getMasterEndpoint().url;
-                var headers = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
-                var curXHR = null;
-
-                return function(term, response) {
-                    if (curXHR && curXHR.state() === 'pending') {
-                        curXHR.abort();
-                    }
-
-                    curXHR = $http({
-                        url: baseURL + "/search/loadSearchPathways?query=" + term,
-                        headers: headers
-                    });
-
-                    curXHR.always(function() { curXHR = null; })
-                    return curXHR.then(
-                        function(data) {
-                            data = data.substring(5, data.length - 1);  // loadSearchPathways returns String with null (JSON).
-                                                                        // This strips it off
-                            response(JSON.parse(data));
-                        },
-                        function() {
-                            response({rows: []}); // response must be called even on failure
-                        }
-                    );
-                };
-            })();
-
-            $scope.removeIdentifier = function(item) {
-                var index = $scope.biomarkers.indexOf(item);
-                if (index >= 0) {
-                    $scope.biomarkers.splice(index, 1);
-                }
-            }
-
-        }]
-
-    };
-}]);
-
-//# sourceURL=capturePlotButton.js
-
-'use strict';
-
-angular.module('smartRApp').directive('capturePlotButton', [function() {
-
-    // aux for downloadSVG
-    var copyWithCollapsedCSS = function(svgElement) {
-        var relevantProperties = [
-            'fill-opacity', 'fill', 'stroke', 'font-size', 'font-family', 'font-weight',
-            'shape-rendering', 'stroke-width', 'opacity', 'text-anchor'
-        ];
-        var clonedSvg = jQuery(svgElement).clone().attr('display', 'none');
-        clonedSvg.insertAfter(svgElement);
-
-        var cachedDefaults = {};
-        var scratchSvg = jQuery(document.createElement('svg'))
-            .attr('display', 'none')
-            .appendTo(jQuery('body'));
-
-        function getDefaultsForElement(jqElement) {
-            var nodeName = jqElement.prop('nodeName');
-            if (!cachedDefaults[nodeName]) {
-                var newElement = jQuery(document.createElement(nodeName))
-                    .appendTo(scratchSvg);
-
-                cachedDefaults[nodeName] = window.getComputedStyle(newElement[0]);
-            }
-            return cachedDefaults[nodeName];
-        }
-
-        clonedSvg.find('*').each(function(idx, element) { // for each element in <svg>
-            var computedStyle = window.getComputedStyle(element);
-
-            var jqElem = jQuery(element);
-            relevantProperties.forEach(function(property) { // for each property
-                var effectiveStyle = computedStyle.getPropertyValue(property);
-                var defaultStyle = getDefaultsForElement(jqElem).getPropertyValue(property);
-
-                if (effectiveStyle !== defaultStyle) {
-                    jqElem.attr(property, effectiveStyle);
-                }
-            });
-        });
-
-        scratchSvg.remove();
-
-        return clonedSvg;
-    };
-
-    var downloadSVG = function(svgElement, fileName) {
-        var serializer = new XMLSerializer();
-        var clonedSvg = copyWithCollapsedCSS(svgElement);
-        var xmlString = serializer.serializeToString(clonedSvg[0]);
-        var blob = new Blob([xmlString], { type: 'image/svg+xml' });
-        var svgBlobUrl = URL.createObjectURL(blob);
-        var link = jQuery('<a/>')
-            .attr('href', svgBlobUrl)
-            .attr('download', fileName)
-            .css('display', 'none');
-        jQuery('body').append(link);
-        link[0].click();
-        link.remove();
-        URL.revokeObjectURL(svgBlobUrl);
-        clonedSvg.remove();
-    };
-
-    return {
-        restrict: 'E',
-        scope: {
-            disabled: '=?',
-            filename: '@',
-            target: '@'
-        },
-        template:
-            '<input type="button" value="Capture" class="heim-action-button" ng-click="capture()">',
-        link: function(scope, elements) {
-
-            var template_btn = elements.children()[0];
-            template_btn.disabled = scope.disabled;
-
-            scope.$watch('disabled', function (newValue) {
-                template_btn.disabled = newValue;
-            }, true);
-
-            if (!scope.filename) {
-                // default filename
-                scope.filename = 'image.svg';
-            }
-
-            scope.capture = function() {
-                var svgElement = $(scope.target + ' svg')[0];
-                if (!svgElement) {
-                    return;
-                }
-                downloadSVG(svgElement, scope.filename);
-            };
-
-        }
-    };
-}]);
-
-//# sourceURL=cohortSummaryInfo.js
-
-'use strict';
-
-angular.module('smartRApp').directive('cohortSummaryInfo', [function() {
-
-    return {
-        restrict: 'E',
-        template: '<span id="sr-cohort-selection" style="font-size: 11px;"></span>',
-        controller: ["$scope", "$element", function($scope, $element) {
-            var span = $element.children()[0];
-
-            function _showCohortInfo() {
-                var cohortsSummary = '';
-
-                for(var i = 1; i <= GLOBAL.NumOfSubsets; i++) {
-                    var currentQuery = getQuerySummary(i);
-                    if(currentQuery !== '') {
-                        cohortsSummary += '<br/>Subset ' + (i) + ': <br/>';
-                        cohortsSummary += currentQuery;
-                        cohortsSummary += '<br/>';
-                    }
-                }
-                if (!cohortsSummary) {
-                    cohortsSummary = '<br/>WARNING: No subsets have been selected! Please go to the "Comparison" tab and select your subsets.';
-                }
-
-                span.innerHTML = cohortsSummary;
-            }
-
-            // Trigger for update is clicking the SmartR panel item. Maybe there is a more elegant way?
-            $scope.$evalAsync(function() {
-                _showCohortInfo(); // set it one time initially
-                $('#resultsTabPanel__smartRPanel').on('click', function() {
-                    _showCohortInfo();
-                });
-            });
-        }]
-    };
-
-}]);
-
-//# sourceURL=conceptBox.js
-
-'use strict';
-
-angular.module('smartRApp').directive('conceptBox', [
-    '$rootScope',
-    '$http',
-    'EndpointService',
-    function ($rootScope, $http, EndpointService) {
-        return {
-            restrict: 'E',
-            scope: {
-                conceptGroup: '=',
-                label: '@',
-                tooltip: '@',
-                min: '@',
-                max: '@',
-                type: '@'
-            },
-            templateUrl: 'src/containers/templates/conceptBox.html',
-            link: function (scope, element) {
-                var max = parseInt(scope.max);
-                var min = parseInt(scope.min);
-
-                var template_box = element[0].querySelector('.sr-drop-input'),
-                    template_btn = element[0].querySelector('.sr-drop-btn'),
-                    template_tooltip = element[0].querySelector('.sr-tooltip-dialog');
-
-                // instantiate tooltips
-                $(template_tooltip).tooltip({track: true, tooltipClass:"sr-ui-tooltip"});
-
-                var _clearWindow = function() {
-                    $(template_box).children().remove();
-                };
-
-                var _getConcepts = function() {
-                    return $(template_box).children().toArray().map(function(childNode) {
-                        return childNode.getAttribute('conceptid');
-                    });
-                };
-
-                var _activateDragAndDrop = function() {
-                    var extObj = Ext.get(template_box);
-                    var dtgI = new Ext.dd.DropTarget(extObj, {ddGroup: 'makeQuery'});
-                    dtgI.notifyDrop = dropOntoCategorySelection; // jshint ignore:line
-                };
-
-                var typeMap = {
-                    hleaficon: 'HD',
-                    alphaicon: 'LD-categorical',
-                    null: 'LD-categorical', // a fix for older tm version without alphaicon
-                    CATEGORICAL_OPTION: 'LD-categorical',
-                    valueicon: 'LD-numerical'
-                };
-                var _containsOnlyCorrectType = function() {
-                    return $(template_box).children().toArray().every(function(childNode) {
-                        return typeMap[childNode.getAttribute('setnodetype')] === scope.type;
-                    });
-                };
-
-                var _getNodeDetails = function (conceptKeys, callback) {
-                    var headers = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
-                    var request = $http({
-                        url: pageInfo.basePath + '/SmartR/nodeDetails',
-                        method: 'POST',
-                        config: {
-                            timeout: 10000
-                        },
-                        data: {
-                            conceptKeys: conceptKeys
-                        },
-                        headers: headers
-                    });
-
-                    request.then(
-                        callback,
-                        function() {
-                            alert('Could not fetch node details. Network connection lost?');
-                        });
-                };
-
-                // activate drag & drop for our conceptBox and color it once it is rendered
-                scope.$evalAsync(function() {
-                    _activateDragAndDrop();
-                });
-
-                // bind the button to its clearing functionality
-                template_btn.addEventListener('click', function() {
-                    _clearWindow();
-                });
-
-                // this watches the childNodes of the conceptBox and updates the model on change
-                new MutationObserver(function() {
-                    scope.conceptGroup.concepts = _getConcepts(); // update the model
-                    scope.validate();
-                    scope.$apply();
-                }).observe(template_box, { childList: true });
-
-                scope.validate = function() {
-                    scope.instructionMinNodes = scope.conceptGroup.concepts.length < min;
-                    scope.instructionMaxNodes = max !== -1 && scope.conceptGroup.concepts.length > max;
-                    scope.instructionNodeType = !_containsOnlyCorrectType();
-                    // FIXME: Disabled for now because this causes problems with certain datasets for unknown reasons
-                    // if (scope.type === 'HD' && scope.conceptGroup.concepts.length > 1) {
-                    //     _getNodeDetails(scope.conceptGroup.concepts, function(response) {
-                    //         if (Object.keys(response.data).length < 2) {
-                    //             var platforms = response.data[Object.keys(response.data)[0]].platforms;
-                    //             scope.instructionNodePlatform = !platforms.every(function(el) { 
-                    //                 return el.title === platforms[0].title;
-                    //             });
-                    //         } else {
-                    //             scope.instructionNodePlatform = true;
-                    //         }
-                    //     });
-                    // } else {
-                    //     scope.instructionNodePlatform = false;
-                    // }
-                    scope.instructionNodePlatform = false;
-                };
-
-                scope.$watchGroup([
-                    'instructionNodeType',
-                    'instructionNodePlatform',
-                    'instructionMaxNodes',
-                    'instructionMinNodes'],
-                    function(newValue) {
-                        var instructionNodeType = newValue[0],
-                            instructionNodePlatform = newValue[1],
-                            instructionMaxNodes = newValue[2],
-                            instructionMinNodes = newValue[3];
-                        scope.conceptGroup.valid = !(instructionNodeType ||
-                                                     instructionNodePlatform ||
-                                                     instructionMaxNodes ||
-                                                     instructionMinNodes);
-                    });
-
-                scope.validate();
-            }
-        };
-    }]);
-
-//# sourceURL=downloadResultsButton.js
-
-angular.module('smartRApp').directive('downloadResultsButton', ['rServeService', function(rServeService)
-{
-    function downloadFile(data) {
-        var link = jQuery('<a/>')
-            .attr('href', rServeService.urlForFile(data.executionId, 'analysis_data.zip'))
-            .attr('download', 'analysis_data.zip')
-            .css('display', 'none');
-        jQuery('body').append(link);
-        link[0].click();
-        link.remove();
-    }
-
-    return {
-        restrict: 'E',
-        scope: {
-            disabled: '='
-        },
-        template:
-            '<input type="button" value="Download" class="heim-action-button">' +
-            '<span style="padding-left: 10px;"></span>',
-        link: function(scope, element) {
-
-            var template_btn = element.children()[0];
-            var template_msg = element.children()[1];
-
-            template_btn.disabled = scope.disabled;
-
-            scope.$watch('disabled', function (newValue) {
-                template_btn.disabled = newValue;
-            }, true);
-
-            template_btn.onclick = function() {
-
-                template_msg.innerHTML = 'Download data, please wait <span class="blink_me">_</span>';
-
-                rServeService.startScriptExecution({
-                    taskType: 'downloadData',
-                    arguments: {}
-                }).then(
-                    function (data){
-                        // download file
-                        template_msg.innerHTML = '';
-                        downloadFile(data);
-                    },
-                    function (msg){
-                        template_msg.innerHTML = 'Failure: ' + msg;
-                    }
-                )
-            };
-        }
-    };
-}]);
-
-//# sourceURL=fetchButton.js
-
-'use strict';
-
-angular.module('smartRApp').directive('fetchButton', [
-    '$rootScope',
-    'rServeService',
-    'smartRUtils',
-    function($rootScope, rServeService, smartRUtils) {
-        return {
-            restrict: 'E',
-            scope: {
-                conceptMap: '=',
-                loaded: '=?',
-                running: '=?',
-                biomarkers: '=?',
-                showSummaryStats: '=?',
-                summaryData: '=?',
-                allSamples: '=?',
-                numberOfRows: '=?',
-                allowedCohorts: '=',
-                projection: '@?',
-                hasPreprocessTab: '=?'
-            },
-            templateUrl: 'src/containers/templates/fetchButton.html',
-            link: function(scope, element) {
-                var template_btn = element.children()[0],
-                    template_msg = element.children()[1];
-
-                var _onSuccess = function() {
-                    if (scope.hasPreprocessTab) {
-                        template_msg.innerHTML = 'Task complete! Go to the "Preprocess" or "Run Analysis" tab to continue.';
-                    } else {
-                        template_msg.innerHTML = 'Task complete! Go to the "Run Analysis" tab to continue.';
-                    }
-                    scope.loaded = true;
-                    template_btn.disabled = false;
-                    scope.running = false;
-                };
-
-                var _onFailure = function(msg) {
-                    template_msg.innerHTML = 'Error: ' + msg;
-                    scope.loaded = false;
-                    template_btn.disabled = false;
-                    scope.running = false;
-                };
-
-                // we add this conditional $watch because there is some crazy promise resolving for allSamples
-                // going on. This is a workaround which observes allSamples and uses it as criteria for successful
-                // completion. FIXME
-                scope.$watch('summaryData', function(newValue) {
-                    if (scope.summaryData &&
-                            scope.showSummaryStats &&
-                            scope.running &&
-                            Object.keys(newValue).indexOf('subsets') !== -1) {
-                        scope.allSamples = newValue.allSamples;
-                        scope.numberOfRows = newValue.numberOfRows;
-                        _onSuccess();
-                    }
-                }, true);
-
-                var _getDataConstraints = function (biomarkers) {
-                    if (typeof biomarkers !== 'undefined' && biomarkers.length > 0) {
-                        var searchKeywordIds = biomarkers.map(function(biomarker) {
-                            return String(biomarker.id);
-                        });
-                        return {
-                            search_keyword_ids: {
-                                keyword_ids: searchKeywordIds
-                            }
-                        };
-                    }
-                };
-
-                var _showSummaryStats = function() {
-                    template_msg.innerHTML = 'Executing summary statistics, please wait <span class="blink_me">_</span>';
-                    rServeService.executeSummaryStats('fetch')
-                        .then(
-                            function(data) { scope.summaryData = data.result; }, // this will trigger $watch
-                            _onFailure
-                        );
-                };
-
-                template_btn.onclick = function() {
-                    template_btn.disabled = true;
-                    template_msg.innerHTML = 'Fetching data, please wait <span class="blink_me">_</span>';
-
-                    scope.summaryData = {};
-                    scope.allSamples = 0;
-                    scope.loaded = false;
-                    scope.running = true;
-                    var deleteReq = rServeService.deleteSessionFiles(); // cleanup our working directory
-                    var cohorts = smartRUtils.countCohorts();
-
-                    if (cohorts === 0) {
-                        _onFailure('No cohorts selected!');
-                        return;
-                    }
-
-                    if (scope.allowedCohorts.indexOf(cohorts) === -1) {
-                        _onFailure('This workflow requires ' + scope.allowedCohorts +
-                                   ' cohort(s), but you selected ' + cohorts);
-                        return;
-                    }
-
-                    for (var conceptGroup in scope.conceptMap) {
-                        if (scope.conceptMap.hasOwnProperty(conceptGroup) && !scope.conceptMap[conceptGroup].valid) {
-                            _onFailure('Your data do not match the requirements! All fields must be green.');
-                            return;
-                        }
-                    }
-
-                    var conceptKeys = smartRUtils.conceptBoxMapToConceptKeys(scope.conceptMap);
-                    if ($.isEmptyObject(conceptKeys)) {
-                        _onFailure('No concepts selected!');
-                        return;
-                    }
-
-                    var dataConstraints = _getDataConstraints(scope.biomarkers);
-
-                    deleteReq.then(
-                        rServeService.loadDataIntoSession(conceptKeys, dataConstraints, scope.projection).then(
-                            scope.showSummaryStats ? _showSummaryStats : _onSuccess,
-                            _onFailure
-                        ),
-                        _onFailure
-                    );
-
-
-            };
-        }
-    };
-    }]);
-
-//# sourceURL=ngTranscludeReplace.js
-
-'use strict';
-
-angular.module('smartRApp').directive('ngTranscludeReplace', ['$log', function ($log) {
-    return {
-        terminal: true,
-        restrict: 'EA',
-
-        link: function ($scope, $element, $attr, ctrl, transclude) {
-            if (!transclude) {
-                $log.error('orphan',
-                    'Illegal use of ngTranscludeReplace directive in the template! ' +
-                    'No parent directive that requires a transclusion found. ');
-                return;
-            }
-            transclude(function (clone) {
-                if (clone.length) {
-                    $element.replaceWith(clone);
-                }
-                else {
-                    $element.remove();
-                }
-            });
-        }
-    };
-}]);
-
-//# sourceURL=preprocessButton.js
-
-'use strict';
-
-angular.module('smartRApp').directive('preprocessButton', [
-    'rServeService',
-    '$rootScope',
-    function(rServeService, $rootScope) {
-        return {
-            restrict: 'E',
-            scope: {
-                running: '=?',
-                params: '=?',
-                showSummaryStats: '=',
-                summaryData: '=',
-                allSamples: '=?',
-                numberOfRows: '=?',
-                projection: '@?'
-            },
-            templateUrl:  'src/containers/templates/preprocessButton.html',
-            link: function(scope, element) {
-
-                var template_btn = element.children()[0];
-                var template_msg = element.children()[1];
-
-                var _onSuccess = function() {
-                    template_msg.innerHTML = 'Task complete! Go to the "Run Analysis" tab to continue.';
-                    template_btn.disabled = false;
-                    scope.running = false;
-                };
-
-                var _onFail = function(msg) {
-                    template_msg.innerHTML = 'Error: ' + msg;
-                    template_btn.disabled = false;
-                    scope.running = false;
-                };
-
-                // we add this conditional $watch because there is some crazy promise resolving for allSamples
-                // going on. This is a workaround which observes allSamples and uses it as criteria for successful
-                // completion. FIXME
-                scope.$watch('summaryData', function(newValue) {
-                    if (scope.summaryData &&
-                            scope.showSummaryStats &&
-                            scope.running &&
-                            Object.keys(newValue).indexOf('subsets') !== -1) {
-                        scope.allSamples = newValue.allSamples;
-                        scope.numberOfRows = newValue.numberOfRows;
-                        _onSuccess();
-                    }
-                }, true);
-
-                var _showSummaryStats = function() {
-                    template_msg.innerHTML = 'Execute summary statistics, please wait <span class="blink_me">_</span>';
-                    rServeService.executeSummaryStats('preprocess', scope.projection).then(
-                        function (data) {
-                            scope.summaryData = data.result; // this will trigger $watch
-                        },
-                        _onFail
-                    );
-                };
-
-                template_btn.onclick = function() {
-                    scope.summaryData = {};
-                    scope.disabled = true;
-                    scope.running = true;
-                    template_msg.innerHTML = 'Preprocessing, please wait <span class="blink_me">_</span>';
-
-                    var params = scope.params ? scope.params : {};
-                    rServeService.preprocess(params).then(
-                        scope.showSummaryStats ? _showSummaryStats : _onSuccess,
-                        _onFail
-                    );
-                };
-            }
-        };
-    }]);
-
-//# sourceURL=runButton.js
-
-'use strict';
-
-angular.module('smartRApp').directive('runButton', [
-    '$rootScope',
-    'rServeService',
-    'smartRUtils',
-    function($rootScope, rServeService, smartRUtils) {
-        return {
-            restrict: 'E',
-            scope: {
-                running: '=?',
-                storage: '=storeResultsIn',
-                script: '@scriptToRun',
-                name: '@buttonName',
-                filename: '@?',
-                params: '=?argumentsToUse',
-                waitMessage: '@?'
-            },
-            templateUrl:  'src/containers/templates/runButton.html',
-            link: function(scope, element) {
-                var params = scope.params ? scope.params : {};
-                if (!scope.waitMessage) {
-                    scope.waitMessage = 'Creating plot, please wait';
-                }
-
-                var template_btn = element.children()[0],
-                    template_msg = element.children()[1];
-
-                var _onSuccess = function(data) {
-                    scope.storage = data;
-                    template_msg.innerHTML = '';
-                    template_btn.disabled = false;
-                    scope.disabled = false;
-                    scope.running = false;
-                };
-
-                var _onFail = function(msg) {
-                    template_msg.innerHTML = 'Error: ' + msg;
-                    template_btn.disabled = false;
-                    scope.disabled = false;
-                    scope.running = false;
-                };
-
-                var _prepareResults = function(response) {
-                    if (scope.filename) {
-                        // when filename is specified it is assumed that results are serialized
-                        // if results are serialized, we need to deserialized them by
-                        // downloading the results files.
-                        rServeService.downloadJsonFile(response.executionId, scope.filename).then(
-                            function(d) { _onSuccess(d.data); },
-                            _onFail
-                        );
-                    } else {
-                        _onSuccess(JSON.parse(response.result.artifacts.value));
-                    }
-                };
-
-                template_btn.onclick = function() {
-                    smartRUtils.cleanUp();
-                    template_btn.disabled = true;
-                    scope.storage = {};
-                    scope.disabled = true;
-                    scope.running = true;
-                    template_msg.innerHTML = scope.waitMessage + ' <span class="blink_me">_</span>';
-
-                    rServeService.startScriptExecution({
-                        taskType: scope.script,
-                        arguments: params
-                    }).then(
-                        _prepareResults,
-                        _onFail
-                    );
-                };
-            }
-        };
-    }]);
-
-//# sourceURL=sortingCriteria.js
-
-'use strict';
-
-angular.module('smartRApp').directive('sortingCriteria', [
-    '$rootScope',
-    function($rootScope) {
-        return {
-            restrict: 'E',
-            scope: {
-                criteria : '=',
-                samples: '=',
-                subsets: '='
-            },
-            templateUrl:   'src/containers/templates/sortingCriteria.html'
-        };
-    }
-]);
-
-'use strict';
-
-angular.module('smartRApp').directive(['summaryStats',
-    '$rootScope',
-    function($rootScope) {
-        return {
-            restrict: 'E',
-            scope: {
-                summaryData: '='
-            },
-            templateUrl:   'src/containers/templates/summaryStatistics.html'
-        };
-    }
-]);
-
-//# sourceURL=tabContainer.js
-
-'use strict';
-
-angular.module('smartRApp').directive('tabContainer',
-    ['$rootScope', 'smartRUtils', '$timeout', function($rootScope, smartRUtils, $timeout) {
-        return {
-            restrict: 'E',
-            transclude: true,
-            templateUrl:  'src/containers/templates/tabContainer.html',
-            controller: ["$scope", function($scope) {
-                $scope.tabs = [];
-                this.addTab = function(tab) {
-                    $scope.tabs.push(tab);
-                };
-            }],
-            link: function() {
-                $timeout(function() { // init jQuery UI tabs after DOM has rendered
-                    $('#heim-tabs').tabs();
-                });
-            }
-        };
-    }]);
-
-//# sourceURL=workflowControls.js
-
-'use strict';
-
-angular.module('smartRApp').directive('workflowControls', [
-    '$rootScope',
-    'smartRUtils',
-    function($rootScope, smartRUtils) {
-        return {
-            restrict: 'E',
-            transclude: true,
-            templateUrl:  'src/containers/templates/workflowControls.html',
-            link: function(scope, element) {
-                var controls = element.children()[0];
-                var scrollbarWidth = smartRUtils.getScrollBarWidth();
-                controls.style.bottom = scrollbarWidth + 'px';
-                controls.style.right = scrollbarWidth + 'px';
-            }
-        };
-    }
-]);
-
-//# sourceURL=workflowTab.js
-
-'use strict';
-
-angular.module('smartRApp').directive('workflowTab', ['smartRUtils', function(smartRUtils) {
-    return {
-        restrict: 'E',
-        scope: {
-            name: '@tabName',
-            disabled: '='
-        },
-        require: '^tabContainer',
-        transclude: true,
-        template: '<ng-transclude-replace></ng-transclude-replace>',
-        link: function(scope, element, attrs, tabContainerCtrl) {
-            var id = 'fragment-' + smartRUtils.makeSafeForCSS(scope.name);
-            scope.id = id;
-            element[0].id = id;
-            tabContainerCtrl.addTab(scope);
-        }
-    };
-}]);
-
-//# sourceURL=workflowWarnings.js
-
-'use strict';
-
-angular.module('smartRApp').directive('workflowWarnings', [
-    '$rootScope',
-    function($rootScope) {
-        return {
-            restrict: 'E',
-            scope: {
-                warnings: '='
-            },
-            templateUrl:  'src/containers/templates/workflowWarnings.html',
-            link: function(scope) {
-                scope.$watch('warnings', function() {
-                    scope.visibility = $.isEmptyObject(scope.warnings) ? 'hidden' : 'visible';
-                    scope.text = '';
-                    for (var warn in scope.warnings) {
-                        if (scope.warnings.hasOwnProperty(warn)) {
-                            scope.text += scope.warnings[warn] + '\n';
-                        }
-                    }
-                }, true);
-            }
-        };
-    }
-]);
 
 angular.module('smartRApp').directive('heatmapPlot', [
     'smartRUtils',
@@ -3518,567 +4081,6 @@ angular.module('smartRApp')
                         templateUrl: 'src/containers/heatmap/heatmap.content.html'
                     },
                     'sidebar@heatmap': {
-                        templateUrl: 'app/components/sidebar/sidebar.html',
-                        controller: 'SidebarCtrl',
-                        controllerAs: 'vm'
-                    }
-                }
-            });
-    }]);
-
-
-'use strict';
-
-angular.module('smartRApp').controller('BoxplotController', [
-    '$scope',
-    'smartRUtils',
-    'commonWorkflowService',
-    function($scope, smartRUtils, commonWorkflowService) {
-
-        commonWorkflowService.initializeWorkflow('boxplot', $scope);
-
-        $scope.fetch = {
-            running: false,
-            disabled: false,
-            loaded: false,
-            conceptBoxes: {
-                datapoints: {concepts: [], valid: false}
-            }
-        };
-
-        $scope.runAnalysis = {
-            running: false,
-            disabled: true,
-            scriptResults: {},
-            params: {}
-        };
-
-        $scope.$watchGroup(['fetch.running', 'runAnalysis.running'],
-            function(newValues) {
-                var fetchRunning = newValues[0],
-                    runAnalysisRunning = newValues[1];
-
-                // clear old results
-                if (fetchRunning) {
-                    $scope.runAnalysis.scriptResults = {};
-                }
-
-                // disable tabs when certain criteria are not met
-                $scope.fetch.disabled = runAnalysisRunning;
-                $scope.runAnalysis.disabled = fetchRunning || !$scope.fetch.loaded;
-            }
-        );
-
-    }]);
-
-
-angular.module('smartRApp').directive('boxplot', [
-    'smartRUtils',
-    'rServeService',
-    '$rootScope',
-    function(smartRUtils, rServeService, $rootScope) {
-
-        return {
-            restrict: 'E',
-            scope: {
-                data: '=',
-                width: '@',
-                height: '@'
-            },
-            templateUrl:  'src/containers/templates/boxplot.html',
-            link: function (scope, element) {
-                var template_ctrl = element.children()[0],
-                    template_viz = element.children()[1];
-                /**
-                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
-                 */
-                scope.$watch('data', function () {
-                    $(template_viz).empty();
-                    if (! $.isEmptyObject(scope.data)) {
-                        smartRUtils.prepareWindowSize(scope.width, scope.height);
-                        scope.showControls = true;
-                        createBoxplot(scope, template_viz, template_ctrl);
-                    }
-                });
-            }
-        };
-
-        function createBoxplot(scope, root) {
-            var concept = '',
-                globalMin = Number.MIN_VALUE,
-                globalMax = Number.MAX_VALUE,
-                categories = [],
-                excludedPatientIDs = [],
-                useLog = false;
-            function setData(data) {
-                concept = data.concept[0];
-                globalMin = data.globalMin[0];
-                globalMax = data.globalMax[0];
-                categories = data['Subset 2'] ? ['Subset 1', 'Subset 2'] : ['Subset 1'];
-                excludedPatientIDs = data.excludedPatientIDs;
-                useLog = data.useLog[0];
-            }
-            setData(scope.data);
-
-            var removeBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-remove-btn');
-            removeBtn.addEventListener('click', removeOutliers);
-
-            var resetBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn');
-            resetBtn.addEventListener('click', reset);
-
-            var kdeCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-kde-check');
-            kdeCheck.addEventListener('change', function() { swapKDE(kdeCheck.checked); });
-            kdeCheck.checked = false;
-
-            var jitterCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-jitter-check');
-            jitterCheck.addEventListener('change', function() { swapJitter(jitterCheck.checked); });
-            jitterCheck.checked = false;
-
-            var logCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-log-check');
-            logCheck.checked = useLog;
-            logCheck.addEventListener('change', function() { swapLog(logCheck.checked); });
-
-            var animationDuration = 1000;
-
-            var width = parseInt(scope.width);
-            var height = parseInt(scope.height);
-            var margin = {top: 20, right: 60, bottom: 200, left: 280};
-
-            var boxWidth = 0.12 * width;
-            var whiskerLength = boxWidth / 6;
-
-            var colorScale = d3.scale.quantile()
-                .range(['rgb(158,1,66)', 'rgb(213,62,79)', 'rgb(244,109,67)', 'rgb(253,174,97)', 'rgb(254,224,139)', 'rgb(255,255,191)', 'rgb(230,245,152)', 'rgb(171,221,164)', 'rgb(102,194,165)', 'rgb(50,136,189)', 'rgb(94,79,162)']);
-
-            var boxplot = d3.select(root).append('svg')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .append('g')
-                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
-
-            var x = d3.scale.ordinal()
-                .domain(categories)
-                .rangeBands([0, width], 1, 0.5);
-
-            var y = d3.scale.linear()
-                .domain([globalMin, globalMax])
-                .range([height, 0]);
-
-            var yAxis = d3.svg.axis()
-                .scale(y)
-                .orient('left');
-
-            var xAxis = d3.svg.axis()
-                .scale(x)
-                .orient('bottom');
-
-            boxplot.append('g')
-                .attr('class', 'y axis')
-                .attr('transform', 'translate(' + 0 + ',' + 0 + ')')
-                .call(yAxis);
-
-            boxplot.append('g')
-                .attr('class', 'x axis')
-                .attr('transform', 'translate(' + 0 + ',' + (height + 20) + ')')
-                .call(xAxis)
-                .selectAll('text')
-                .attr('dy', '.35em')
-                .attr('transform', 'translate(' + 0 + ',' + 5 + ')rotate(45)')
-                .style('text-anchor', 'start');
-
-            boxplot.append('text')
-                .attr('transform', 'translate(' + (-40) + ',' + (height / 2) + ')rotate(-90)')
-                .attr('text-anchor', 'middle')
-                .text(smartRUtils.shortenConcept(concept) + (useLog ? ' (log2)' : ''));
-
-            var tip = d3.tip()
-                .attr('class', 'd3-tip')
-                .offset([-10, 0])
-                .html(function(d) { return d; });
-
-            boxplot.call(tip);
-
-            var brush = d3.svg.brush()
-                .x(d3.scale.identity().domain([0, width]))
-                .y(d3.scale.identity().domain([-5, height + 5]))
-                .on('brush', function () {
-                    contextMenu.hide();
-                    updateSelection();
-                });
-
-            boxplot.append('g')
-                .attr('class', 'brush')
-                .on('mousedown', function () {
-                    if (d3.event.button === 2) {
-                        d3.event.stopImmediatePropagation();
-                    }
-                })
-                .call(brush);
-
-            var contextMenu = d3.tip()
-                .attr('class', 'd3-tip sr-contextmenu')
-                .html(function(d) { return d; });
-
-            boxplot.call(contextMenu);
-
-            function _addEventListeners() {
-                smartRUtils.getElementWithoutEventListeners('sr-boxplot-exclude-btn').addEventListener('click', function() {
-                    contextMenu.hide();
-                    excludeSelection();
-                });
-
-                smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn-2').addEventListener('click', function() {
-                    contextMenu.hide();
-                    reset();
-                });
-            }
-
-            boxplot.on('contextmenu', function () {
-                d3.event.preventDefault();
-                contextMenu.show('<input id="sr-boxplot-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
-                    '<input id="sr-boxplot-reset-btn-2" value="Reset" class="sr-ctx-menu-btn">');
-                _addEventListeners();
-            });
-
-        var currentSelection;
-        function updateSelection() {
-            d3.selectAll('.point').classed('brushed', false);
-            var extent = brush.extent();
-            var left = extent[0][0],
-                top = extent[0][1],
-                right = extent[1][0],
-                bottom = extent[1][1];
-            currentSelection = d3.selectAll('.point')
-                .filter(function (d) {
-                    var point = d3.select(this);
-                    return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
-                })
-                .classed('brushed', true)
-                .data()
-                .map(function(d) { return d.patientID; });
-        }
-
-            function excludeSelection() {
-                excludedPatientIDs = excludedPatientIDs.concat(currentSelection);
-                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
-
-                rServeService.startScriptExecution({
-                    taskType: 'run',
-                    arguments: settings
-                }).then(
-                    function (response) {
-                        removePlot();
-                        scope.data = JSON.parse(response.result.artifacts.value);
-                    },
-                    function (response) {
-                        console.error(response);
-                    }
-                );
-            }
-
-            function removePlot() {
-                d3.select(root).selectAll('*').remove();
-                d3.selectAll('.d3-tip').remove();
-            }
-
-        function removeOutliers() {
-            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
-            if (currentSelection) { excludeSelection(); }
-        }
-
-            function kernelDensityEstimator(kernel, x) {
-                return function (sample) {
-                    return x.map(function (x) {
-                        return [x, d3.mean(sample, function (v) {
-                            return kernel(x - v);
-                        })];
-                    });
-                };
-            }
-
-            function epanechnikovKernel(scale) {
-                return function (u) {
-                    return Math.abs(u /= scale) <= 1 ? 0.75 * (1 - u * u) / scale : 0;
-                };
-            }
-
-            // function gaussKernel(scale) {
-            //     return function (u) {
-            //         return Math.exp(-u * u / 2) / Math.sqrt(2 * Math.PI) / scale;
-            //     };
-            // }
-
-            function swapKDE(checked) {
-                if (!checked) {
-                    d3.selectAll('.line').attr('visibility', 'hidden');
-                } else {
-                    d3.selectAll('.line').attr('visibility', 'visible');
-                }
-            }
-
-            function shortenNodeLabel(label) {
-                label = label.replace(/\W+/g, '');
-                return label;
-            }
-
-            var jitterWidth = 1.0;
-
-            function swapJitter() {
-                categories.forEach(function(category) {
-                    d3.selectAll('.point.' + smartRUtils.makeSafeForCSS(shortenNodeLabel(category)))
-                        .transition()
-                        .duration(animationDuration)
-                        .attr('cx', function(d) {
-                            return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
-                        });
-                });
-            }
-
-            function swapLog() {
-                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
-                rServeService.startScriptExecution({
-                    taskType: 'run',
-                    arguments: settings
-                }).then(
-                    function (response) {
-                        removePlot();
-                        scope.data = JSON.parse(response.result.artifacts.value);
-                    },
-                    function (response) {
-                        console.error(response);
-                    }
-                );
-            }
-
-            var boxes = {};
-            categories.forEach(function(category) {
-                boxes[category] = boxplot.append('g');
-                var params = scope.data[category];
-                createBox(params, category, boxes[category]);
-            });
-
-            function createBox(params, category, box) {
-                var boxLabel = shortenNodeLabel(category);
-                colorScale.domain(d3.extent(y.domain()));
-
-                var whisker = box.selectAll('.whisker')
-                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
-                        return boxLabel + '-whisker-' + i;
-                    });
-
-                whisker.enter()
-                    .append('line')
-                    .attr('class', 'whisker');
-
-                whisker.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x(category) - whiskerLength / 2)
-                    .attr('y1', function (d) { return y(d); })
-                    .attr('x2', x(category) + whiskerLength / 2)
-                    .attr('y2', function (d) { return y(d); });
-
-                var whiskerLabel = box.selectAll('.whiskerLabel')
-                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
-                        return boxLabel + '-whiskerLabel-' + i;
-                    });
-
-                whiskerLabel.enter()
-                    .append('text')
-                    .attr('class', 'whiskerLabel boxplotValue');
-
-                whiskerLabel.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) + whiskerLength / 2)
-                    .attr('y', function (d) { return y(d); })
-                    .attr('dx', '.35em')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'start')
-                    .text(function (d) { return d; });
-
-                var hingeLength = boxWidth;
-                var hinge = box.selectAll('.hinge')
-                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
-                        return boxLabel + '-hinge-' + i;
-                    });
-
-                hinge.enter()
-                    .append('line')
-                    .attr('class', 'hinge');
-
-                hinge.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x(category) - hingeLength / 2)
-                    .attr('y1', function (d) { return y(d); })
-                    .attr('x2', x(category) + hingeLength / 2)
-                    .attr('y2', function (d) { return y(d); });
-
-                var hingeLabel = box.selectAll('.hingeLabel')
-                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
-                        return boxLabel + '-hingeLabel-' + i;
-                    });
-
-                hingeLabel.enter()
-                    .append('text')
-                    .attr('class', 'hingeLabel boxplotValue');
-
-                hingeLabel.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) - hingeLength / 2)
-                    .attr('y', function (d) { return y(d); })
-                    .attr('dx', '-.35em')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'end')
-                    .text(function (d) { return d; });
-
-                var connection = box.selectAll('.connection')
-                    .data([[params.upperWhisker, params.upperHinge], [params.lowerWhisker, params.lowerHinge]],
-                        function (d, i) { return boxLabel + '-connection-' + i; });
-
-                connection.enter()
-                    .append('line')
-                    .attr('class', 'connection');
-
-                connection.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x(category))
-                    .attr('y1', function (d) { return y(d[0]); })
-                    .attr('x2', x(category))
-                    .attr('y2', function (d) { return y(d[1]); });
-
-                var upperBox = box.selectAll('.box.upper')
-                    .data(params.upperHinge, function (d) { return d; });
-
-                upperBox.enter()
-                    .append('rect')
-                    .attr('class', 'box upper');
-
-                upperBox.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) - hingeLength / 2)
-                    .attr('y', y(params.upperHinge))
-                    .attr('height', Math.abs(y(params.upperHinge) - y(params.median)))
-                    .attr('width', hingeLength);
-
-                var lowerBox = box.selectAll('.box.lower')
-                    .data(params.lowerHinge, function (d) { return d; });
-
-                lowerBox.enter()
-                    .append('rect')
-                    .attr('class', 'box lower');
-
-                lowerBox.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) - hingeLength / 2)
-                    .attr('y', y(params.median))
-                    .attr('height', Math.abs(y(params.median) - y(params.lowerHinge)))
-                    .attr('width', hingeLength);
-
-                var medianLabel = box.selectAll('.medianLabel')
-                    .data(params.median, function (d) { return d;});
-
-                medianLabel.enter()
-                    .append('text')
-                    .attr('class', 'medianLabel boxplotValue');
-
-                medianLabel.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) + hingeLength / 2)
-                    .attr('y', function () { return y(params.median); })
-                    .attr('dx', '.35em')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'start')
-                    .text(params.median);
-
-                var point = box.selectAll('.point')
-                    .data(params.rawData, function (d) { return boxLabel + '-' + d.patientID; });
-
-                point.enter()
-                    .append('circle')
-                    .attr('cx', function (d) {
-                        return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
-                    })
-                    .attr('r', 0)
-                    .attr('fill', function (d) { return colorScale(d.value); })
-                    .on('mouseover', function (d) {
-                        tip.show('Value: ' + d.value + '</br>' +
-                            'PatientID: ' + d.patientID + '</br>' +
-                            'Outlier: ' + d.outlier);
-                    })
-                    .on('mouseout', function () {
-                        tip.hide();
-                    });
-
-                point
-                    .attr('class', function (d) {
-                        return 'point patientID-' + smartRUtils.makeSafeForCSS(d.patientID) +
-                            (d.outlier ? ' outlier ' : ' ') + smartRUtils.makeSafeForCSS(boxLabel);
-                    }) // This is here and not in the .enter() because points might become outlier on removal of other points
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('cy', function (d) { return y(d.value); })
-                    .attr('r', 3);
-
-                point.exit()
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('r', 0)
-                    .remove();
-
-                var yCopy = y.copy();
-                yCopy.domain([params.lowerWhisker, params.upperWhisker]);
-                var kde = kernelDensityEstimator(epanechnikovKernel(6), yCopy.ticks(100));
-                var values = params.rawData.map(function (d) { return d.value; });
-                var estFun = kde(values);
-                var kdeDomain = d3.extent(estFun, function (d) { return d[1]; });
-                var kdeScale = d3.scale.linear()
-                    .domain(kdeDomain)
-                    .range([0, boxWidth / 2]);
-                var lineGen = d3.svg.line()
-                    .x(function (d) { return x(category) - kdeScale(d[1]); })
-                    .y(function (d) { return y(d[0]); });
-
-                box.append('path')
-                    .attr('class', 'line')
-                    .attr('visibility', 'hidden')
-                    .datum(estFun)
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('d', lineGen);
-            }
-
-            function removeBrush() {
-                d3.selectAll('.brush')
-                    .call(brush.clear());
-            }
-
-            function reset() {
-                removeBrush();
-                excludedPatientIDs = [];
-                currentSelection = [];
-                excludeSelection(); // Abusing the method because I can
-            }
-
-        }
-
-    }]);
-
-
-angular.module('smartRApp')
-    .config(["$stateProvider", function ($stateProvider) {
-        $stateProvider
-            .state('boxplot', {
-                parent: 'site',
-                url: '/boxplot',
-                views: {
-                    '@': {
-                        templateUrl: 'src/containers/boxplot/boxplot.html'
-                    },
-                    'content@boxplot': {
-                        templateUrl: 'src/containers/boxplot/boxplot.content.html',
-                        controller: 'BoxplotController',
-                        controllerAs: 'vm'
-                    },
-                    'sidebar@boxplot': {
                         templateUrl: 'app/components/sidebar/sidebar.html',
                         controller: 'SidebarCtrl',
                         controllerAs: 'vm'
