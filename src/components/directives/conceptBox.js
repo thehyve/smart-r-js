@@ -39,11 +39,13 @@ angular.module('smartRApp').directive('conceptBox', [
                     });
                 };
 
-                var _activateDragAndDrop = function() {
-                    var extObj = Ext.get(template_box);
-                    var dtgI = new Ext.dd.DropTarget(extObj, {ddGroup: 'makeQuery'});
-                    dtgI.notifyDrop = dropOntoCategorySelection; // jshint ignore:line
-                };
+                // Avoid ExtJS lib
+                // =====================================================================
+                //var _activateDragAndDrop = function() {
+                //    var extObj = Ext.get(template_box);
+                //    var dtgI = new Ext.dd.DropTarget(extObj, {ddGroup: 'makeQuery'});
+                //    dtgI.notifyDrop = dropOntoCategorySelection; // jshint ignore:line
+                //};
 
                 var typeMap = {
                     hleaficon: 'HD',
@@ -81,7 +83,7 @@ angular.module('smartRApp').directive('conceptBox', [
 
                 // activate drag & drop for our conceptBox and color it once it is rendered
                 scope.$evalAsync(function() {
-                    _activateDragAndDrop();
+                    //_activateDragAndDrop();
                 });
 
                 // bind the button to its clearing functionality
