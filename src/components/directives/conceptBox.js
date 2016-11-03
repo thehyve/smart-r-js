@@ -49,6 +49,7 @@ angular.module('smartRApp').directive('conceptBox', [
                     hleaficon: 'HD',
                     alphaicon: 'LD-categorical',
                     null: 'LD-categorical', // a fix for older tm version without alphaicon
+                    CATEGORICAL_OPTION: 'LD-categorical',
                     valueicon: 'LD-numerical'
                 };
                 var _containsOnlyCorrectType = function() {
