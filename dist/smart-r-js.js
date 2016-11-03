@@ -323,6 +323,1091 @@ angular.module('smartRApp').controller('VolcanoplotController', [
     }]);
 
 
+//# sourceURL=commonWorkflowService.js
+
+'use strict';
+
+angular.module('smartRApp').factory('commonWorkflowService', ['rServeService', function(rServeService) {
+    var service = {};
+
+    service.initializeWorkflow = function(workflowName, scope) {
+        service.currentScope = scope;
+
+        rServeService.destroyAndStartSession(workflowName);
+    };
+
+    return service;
+
+}]);
+
+//# sourceURL=rServeService.js
+
+'use strict';
+
+angular.module('smartRApp').factory('rServeService', [
+    'smartRUtils',
+    '$q',
+    '$http',
+    'EndpointService',
+    function (smartRUtils, $q, $http, EndpointService) {
+        var baseURL = EndpointService.getMasterEndpoint().url;
+
+        var service = {};
+
+        var NOOP_ABORT = function () {
+        };
+        var TIMEOUT = 10000; // 10 s
+        var CHECK_DELAY = 500; // 0.5 s
+        var SESSION_TOUCH_DELAY = 60000; // 1 min
+
+        /* we only support one session at a time */
+
+        var state = {
+            currentRequestAbort: NOOP_ABORT,
+            sessionId: null,
+            touchTimeout: null // for current session id
+        };
+//headers: {'Authorization': 'xxxyyyzzz'}
+        var workflow = '';
+        /* returns a promise with the session id and
+         * saves the session id for future calls */
+        var authorizationHeader = '';
+        service.startSession = function (name) {
+            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
+            authorizationHeader = authHeaders['Authorization'];
+            baseURL = EndpointService.getMasterEndpoint().url;
+            workflow = name;
+            var request = $http({
+                url: baseURL + '/RSession/create',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                    Accept: "application/hal+json"
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    workflow: workflow
+                }
+            });
+
+            return $q(function (resolve, reject) {
+                request.then(
+                    function (response) {
+                        state.sessionId = response.data.sessionId;
+                        rServeService_scheduleTouch();
+                        resolve();
+                    },
+                    function (response) {
+                        reject(response.statusText);
+                    }
+                );
+            });
+        };
+
+        service.fetchImageResource = function (uri) {
+            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
+            authorizationHeader = authHeaders['Authorization'];
+
+            var deferred = $q.defer();
+
+            var header = {};
+            header.Authorization = authorizationHeader;
+
+            $http({
+                method: 'GET',
+                headers: header,
+                url: uri,
+                responseType: 'arraybuffer',
+                eventHandlers: {
+                    progress: function (e) {
+                        deferred.notify(e);
+                    }
+                }
+            }).then(function (res) {
+                var arr = new Uint8Array(res.data);
+
+                // Convert the int array to a binary string
+                // We have to use apply() as we are converting an *array*
+                // and String.fromCharCode() takes one or more single values, not
+                // an array.
+                var raw = String.fromCharCode.apply(null, arr);
+                var b64 = btoa(raw);
+                var dataURL = "data:image/jpeg;base64," + b64;
+
+                return deferred.resolve(dataURL);
+            }).catch(function (err) {
+                return deferred.reject({
+                    status: this.status,
+                    statusText: xmlHTTP.statusText
+                })
+            });
+
+            return deferred.promise;
+        };
+
+        service.touch = function (sessionId) {
+            if (sessionId !== state.sessionId) {
+                return;
+            }
+
+            var touchRequest = $http({
+                url: baseURL + '/RSession/touch',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    sessionId: sessionId
+                }
+            });
+
+            touchRequest.finally(function () {
+                rServeService_scheduleTouch(); // schedule another
+            });
+        };
+
+        function rServeService_scheduleTouch() {
+            window.clearTimeout(state.touchTimeout);
+            state.touchTimeout = window.setTimeout(function () {
+                service.touch(state.sessionId);
+            }, SESSION_TOUCH_DELAY);
+        }
+
+        service.deleteSessionFiles = function (sessionId) {
+            sessionId = sessionId || state.sessionId;
+
+            return $http({
+                url: baseURL + '/RSession/deleteFiles',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    sessionId: sessionId
+                }
+            });
+        };
+
+        service.destroySession = function (sessionId) {
+            sessionId = sessionId || state.sessionId;
+
+            if (!sessionId) {
+                return;
+            }
+
+            var request = $http({
+                url: baseURL + '/RSession/delete',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    sessionId: sessionId
+                }
+            });
+
+            return request.finally(function () {
+                if (state.sessionId === sessionId) {
+                    service.abandonCurrentSession();
+                }
+            });
+        };
+
+        service.abandonCurrentSession = function () {
+            window.clearTimeout(state.touchTimeout);
+            state.sessionId = null;
+        };
+
+        service.destroyAndStartSession = function (workflowName) {
+            $q.when(service.destroySession()).then(function () {
+                service.startSession(workflowName);
+            });
+        };
+
+        /*
+         * taskData = {
+         *     arguments: { ... },
+         *     taskType: 'fetchData' or name of R script minus .R,
+         *     phase: 'fetch' | 'preprocess' | 'run',
+         * }
+         */
+        service.startScriptExecution = function (taskDataOrig) {
+
+            var taskData = $.extend({}, taskDataOrig); // clone the thing
+            state.currentRequestAbort();
+
+            var canceler = $q.defer();
+            var _httpArg = {
+                url: baseURL + '/ScriptExecution/run',
+                method: 'POST',
+                timeout: canceler.promise,
+                responseType: 'json',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                data: {
+                    sessionId: state.sessionId,
+                    arguments: taskData.arguments,
+                    taskType: taskData.taskType,
+                    workflow: workflow
+                }
+            };
+            console.log(_httpArg);
+            var runRequest = $http(_httpArg);
+
+            runRequest.finally(function () {
+                state.currentRequestAbort = NOOP_ABORT;
+            });
+
+            state.currentRequestAbort = function () {
+                canceler.resolve();
+            };
+
+            /* schedule checks */
+            var promise = $q(function (resolve, reject) {
+                runRequest.then(
+                    function (response) {
+                        if (!response.data) {
+                            console.error('Unexpected response:', response);
+                        }
+                        taskData.executionId = response.data.executionId;
+                        _checkStatus(taskData.executionId, resolve, reject);
+                    },
+                    function (response) {
+                        reject(response.statusText);
+                    }
+                );
+            });
+
+            promise.cancel = function () {
+                // calling this method should by itself resolve the promise
+                state.currentRequestAbort();
+            };
+
+            // no touching necessary when a task is running
+            window.clearTimeout(state.touchTimeout);
+            promise.finally(rServeService_scheduleTouch.bind(this));
+
+            return promise;
+        };
+
+        /* aux function of _startScriptExecution. Needs to follow its contract
+         * with respect to the fail and success result of the promise */
+        function _checkStatus(executionId, resolve, reject) {
+            var canceler = $q.defer();
+            var statusRequest = $http({
+                method: 'GET',
+                timeout: canceler.promise,
+                headers: {
+                    Authorization: authorizationHeader,
+                },
+                url: baseURL + '/ScriptExecution/status' +
+                '?sessionId=' + state.sessionId +
+                '&executionId=' + executionId
+            });
+
+            statusRequest.finally(function () {
+                state.currentRequestAbort = NOOP_ABORT;
+            });
+            state.currentRequestAbort = function () {
+                canceler.resolve();
+            };
+
+            statusRequest.then(
+                function (d) {
+                    if (d.data.state === 'FINISHED') {
+                        d.data.executionId = executionId;
+                        resolve(d.data);
+                    } else if (d.data.state === 'FAILED') {
+                        reject(d.data.result.exception);
+                    } else {
+                        // else still pending
+                        window.setTimeout(function () {
+                            _checkStatus(executionId, resolve, reject);
+                        }, CHECK_DELAY);
+                    }
+                },
+                function (response) {
+                    reject(response.statusText);
+                }
+            );
+        }
+
+        service.downloadJsonFile = function (executionId, filename) {
+            return $http({
+                method: 'GET',
+                url: this.urlForFile(executionId, filename),
+                headers: {
+                    Authorization: authorizationHeader,
+                },
+            });
+        };
+
+
+        service.urlForFile = function (executionId, filename) {
+            return baseURL +
+                '/ScriptExecution/downloadFile?sessionId=' + state.sessionId +
+                '&executionId=' + executionId + '&filename=' + filename;
+        };
+
+        service.loadDataIntoSession = function (conceptKeys, dataConstraints, projection) {
+            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
+            return $q(function (resolve, reject) {
+                smartRUtils.getSubsetIds().then(
+                    function (subsets) {
+                        var _arg = {
+                            conceptKeys: conceptKeys,
+                            resultInstanceIds: subsets,
+                            projection: projection
+                        };
+
+                        if (typeof dataConstraints !== 'undefined') {
+                            _arg.dataConstraints = dataConstraints;
+                        }
+                        console.log(_arg);
+                        service.startScriptExecution({
+                            taskType: 'fetchData',
+                            arguments: _arg
+                        }).then(
+                            resolve,
+                            function (response) {
+                                reject(response);
+                            }
+                        );
+                    },
+                    function () {
+                        reject('Could not create subsets!');
+                    }
+                );
+            });
+        };
+
+        service.executeSummaryStats = function (phase, projection) {
+            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
+            return $q(function (resolve, reject) {
+                service.startScriptExecution({
+                    taskType: 'summary',
+                    arguments: {
+                        phase: phase,
+                        projection: projection // always required, even for low-dim data
+                    }
+                }).then(
+                    function (response) {
+                        if (response.result.artifacts.files.length > 0) {
+                            service.composeSummaryResults(response.result.artifacts.files, response.executionId, phase)
+                                .then(
+                                    function (result) {
+                                        resolve({result: result});
+                                    },
+                                    function (msg) {
+                                        reject(msg.statusText);
+                                    }
+                                );
+                        } else {
+                            resolve({result: {}});
+                        }
+                    },
+                    function (response) {
+                        reject(response);
+                    }
+                );
+            });
+        };
+
+        service.composeSummaryResults = function (files, executionId, phase) {
+            // FIXME: errors from downloadJsonFile do not lead to a reject
+            return $q(function (resolve, reject) {
+                var retObj = {summary: [], allSamples: 0, numberOfRows: 0},
+                    fileExt = {fetch: ['.png', 'json'], preprocess: ['all.png', 'all.json']},
+
+                // find matched items in an array by key
+                    _find = function composeSummaryResults_find(key, array) {
+                        // The variable results needs var in this case (without 'var' a global variable is created)
+                        var results = [];
+                        for (var i = 0; i < array.length; i++) {
+                            if (array[i].search(key) > -1) {
+                                results.push(array[i]);
+                            }
+                        }
+                        return results;
+                    },
+
+                // process each item
+                    _processItem = function composeSummaryResults_processItem(img, json) {
+                        return $q(function (resolve) {
+                            service.downloadJsonFile(executionId, json).then(
+                                function (d) {
+                                    retObj.subsets = d.data.length;
+                                    d.data.forEach(function (subset) {
+                                        retObj.allSamples += subset.numberOfSamples;
+                                        retObj.numberOfRows = subset.totalNumberOfValuesIncludingMissing /
+                                            subset.numberOfSamples;
+                                    });
+                                    resolve({img: service.urlForFile(executionId, img), json: d});
+                                },
+                                function (err) {
+                                    reject(err);
+                                }
+                            );
+                        });
+                    };
+
+                // first identify image and json files
+                var _images = _find(fileExt[phase][0], files),
+                    _jsons = _find(fileExt[phase][1], files);
+
+                // load each json file contents
+                for (var i = 0; i < _images.length; i++) {
+                    retObj.summary.push(_processItem(_images[i], _jsons[i]));
+                }
+
+                $.when.apply($, retObj.summary).then(function () {
+                    resolve(retObj); // when all contents has been loaded
+                });
+            });
+        };
+
+        service.preprocess = function (args) {
+            return $q(function (resolve, reject) {
+                service.startScriptExecution({
+                    taskType: 'preprocess',
+                    arguments: args
+                }).then(
+                    resolve,
+                    function (response) {
+                        reject(response);
+                    }
+                );
+            });
+        };
+
+        return service;
+    }]);
+
+//# sourceURL=smartRUtils.js
+
+'use strict';
+
+angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService', function($q,
+                                                                                           CohortSharingService) {
+
+    var service = {};
+
+    var nodeToKey = function (node) {
+        return node.restObj.key;
+    };
+
+    service.conceptBoxMapToConceptKeys = function smartRUtils_conceptBoxMapToConceptKeys(conceptBoxMap) {
+        var allConcepts = {};
+        Object.keys(conceptBoxMap).forEach(function(group) {
+            var concepts = conceptBoxMap[group].concepts;
+            concepts.forEach(function(concept, idx) {
+                allConcepts[group + '_' + 'n' + idx] = nodeToKey(concept);
+            });
+        });
+        return allConcepts;
+    };
+
+    /**
+     * Creates a CSS safe version of a given string
+     * This should be used consistently across the whole of SmartR to avoid data induced CSS errors
+     *
+     * @param str
+     * @returns {string}
+     */
+    service.makeSafeForCSS = function smartRUtils_makeSafeForCSS(str) {
+        return String(str).replace(/[^a-z0-9]/g, function(s) {
+            var c = s.charCodeAt(0);
+            if (c === 32) {
+                return '-';
+            }
+            if (c >= 65 && c <= 90) {
+                return '_' + s.toLowerCase();
+            }
+            return '__' + ('000' + c.toString(16)).slice(-4);
+        });
+    };
+
+    service.getElementWithoutEventListeners = function(cssSelector) {
+        var element = document.getElementById(cssSelector);
+        var copy = element.cloneNode(true);
+        element.parentNode.replaceChild(copy, element);
+        return copy;
+    };
+
+    service.shortenConcept = function smartRUtils_shortenConcept(concept) {
+        var split = concept.split('\\');
+        split = split.filter(function(str) { return str !== ''; });
+        return split[split.length - 2] + '/' + split[split.length - 1];
+    };
+
+    // Calculate width of text from DOM element or string. By Phil Freo <http://philfreo.com>
+    $.fn.textWidth = function(text, font) {
+        if (!$.fn.textWidth.fakeEl) {
+            $.fn.textWidth.fakeEl = $('<span>').hide().appendTo(document.body);
+        }
+        $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
+        return $.fn.textWidth.fakeEl.width();
+    };
+
+    service.getTextWidth = function(text, font) {
+        return $.fn.textWidth(text, font);
+    };
+
+    /**
+     * Executes callback with scroll position when SmartR mainframe is scrolled
+     * @param function
+     */
+    service.callOnScroll = function(callback) {
+        $('#sr-index').parent().scroll(function() {
+            var scrollPos = $(this).scrollTop();
+            callback(scrollPos);
+        });
+    };
+
+    service.prepareWindowSize = function(width, height) {
+        $('#heim-tabs').css('min-width', parseInt(width) + 25);
+        $('#heim-tabs').css('min-height', parseInt(height) + 25);
+    };
+
+    /**
+    * removes all kind of elements that might live out of the viz directive (e.g. tooltips, contextmenu, ...)
+    */
+    service.cleanUp = function() {
+        $('.d3-tip').remove();
+    };
+
+    service.countCohorts = function() {
+        return CohortSharingService.getSelection().length;
+    };
+
+    service.getSubsetIds = function smartRUtil_getSubsetIds() {
+        var defer = $q.defer();
+        defer.resolve(CohortSharingService.getSelection());
+        return defer.promise;
+    };
+
+    return service;
+}]);
+
+angular.module('smartRApp').directive('correlationPlot', [
+    'smartRUtils',
+    'rServeService',
+    function(smartRUtils, rServeService) {
+
+        return {
+            restrict: 'E',
+            scope: {
+                data: '=',
+                width: '@',
+                height: '@'
+            },
+            link: function (scope, element) {
+
+                /**
+                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
+                 */
+                scope.$watch('data', function() {
+                    $(element[0]).empty();
+                    if (! $.isEmptyObject(scope.data)) {
+                        smartRUtils.prepareWindowSize(scope.width, scope.height);
+                        createCorrelationViz(scope, element[0]);
+                    }
+                });
+            }
+        };
+
+        function createCorrelationViz(scope, root) {
+            var animationDuration = 500;
+            var bins = 10;
+            var w = parseInt(scope.width);
+            var h = parseInt(scope.height);
+            var margin = {top: 20, right: 250, bottom: h / 4 + 230, left: w / 4};
+            var width = w * 3 / 4 - margin.left - margin.right;
+            var height = h * 3 / 4 - margin.top - margin.bottom;
+            var bottomHistHeight = margin.bottom;
+            var leftHistHeight = margin.left;
+            var colors = ['#33FF33', '#3399FF', '#CC9900', '#CC99FF', '#FFFF00', 'blue'];
+            var x = d3.scale.linear()
+                .domain(d3.extent(scope.data.points, function(d) { return d.x; }))
+                .range([0, width]);
+            var y = d3.scale.linear()
+                .domain(d3.extent(scope.data.points, function(d) { return d.y; }))
+                .range([height, 0]);
+
+            var annotations = scope.data.annotations.sort();
+            for (var i = 0; i < annotations.length; i++) {
+                var annotation = annotations[i];
+                if (annotation === '') {
+                    annotations[i] = 'Default';
+                }
+            }
+
+            var xArrLabel = scope.data.xArrLabel[0];
+            var yArrLabel = scope.data.yArrLabel[0];
+
+            var correlation,
+                pvalue,
+                regLineSlope,
+                regLineYIntercept,
+                patientIDs,
+                points,
+                method,
+                transformation,
+                minX,
+                maxX,
+                minY,
+                maxY;
+            function setData(data) {
+                correlation = data.correlation[0];
+                pvalue = data.pvalue[0];
+                regLineSlope = data.regLineSlope[0];
+                regLineYIntercept = data.regLineYIntercept[0];
+                method = data.method[0];
+                transformation = data.transformation[0];
+                patientIDs = data.patientIDs;
+                points = data.points;
+                var xValues =  data.points.map(function(d) { return d.x; });
+                var yValues =  data.points.map(function(d) { return d.y; });
+                minX = Math.min.apply(null, xValues);
+                minY = Math.min.apply(null, yValues);
+                maxX = Math.max.apply(null, xValues);
+                maxY = Math.max.apply(null, yValues);
+            }
+
+            setData(scope.data);
+
+            function updateStatistics(patientIDs, scatterUpdate, init) {
+                if (! init) {
+                    patientIDs = patientIDs.length !== 0 ? patientIDs : d3.selectAll('.point').data().map(function(d) {
+                        return d.patientID;
+                    });
+                }
+                var args = { method: method, transformation: transformation, selectedPatientIDs: patientIDs };
+
+                rServeService.startScriptExecution({
+                    taskType: 'run',
+                    arguments: args
+                }).then(
+                    function (response) {
+                        var results = JSON.parse(response.result.artifacts.value);
+                        if (init) {
+                            removePlot();
+                            scope.data = results;
+                        } else {
+                            setData(results);
+                            if (scatterUpdate) {
+                                updateScatterplot();
+                            }
+                            updateRegressionLine();
+                            updateLegends();
+                            updateHistogram();
+                        }
+                    },
+                    function (response) {
+                        console.error(response);
+                    }
+                );
+            }
+
+            function removePlot() {
+                d3.select(root).selectAll('*').remove();
+                d3.selectAll('.d3-tip').remove();
+            }
+
+            var svg = d3.select(root).append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
+                .on('contextmenu', function() {
+                    d3.event.preventDefault();
+                    contextMenu.show('<input id="sr-correlation-zoom-btn" value="Zoom" class="sr-ctx-menu-btn"><br/>' +
+                                     '<input id="sr-correlation-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
+                                     '<input id="sr-correlation-reset-btn" value="Reset" class="sr-ctx-menu-btn">');
+                    _addEventListeners();
+                });
+
+            function _addEventListeners() {
+                smartRUtils.getElementWithoutEventListeners('sr-correlation-zoom-btn').addEventListener('click', function() {
+                    contextMenu.hide();
+                    zoomSelection();
+                });
+                smartRUtils.getElementWithoutEventListeners('sr-correlation-exclude-btn').addEventListener('click', function() {
+                    contextMenu.hide();
+                    excludeSelection();
+                });
+                smartRUtils.getElementWithoutEventListeners('sr-correlation-reset-btn').addEventListener('click', function() {
+                    contextMenu.hide();
+                    reset();
+                });
+            }
+
+            var tip = d3.tip()
+                .attr('class', 'd3-tip')
+                .offset([-10, 0])
+                .html(function(d) { return d; });
+
+            svg.call(tip);
+
+            svg.append('g')
+                .attr('class', 'x axis')
+                .attr('transform', 'translate(0, 0)')
+                .call(d3.svg.axis()
+                    .scale(x)
+                    .ticks(10)
+                    .tickFormat('')
+                    .innerTickSize(height)
+                    .orient('bottom'));
+
+            svg.append('text')
+                .attr('class', 'axisLabels')
+                .attr('transform', 'translate(' + width / 2 + ',' + (- 10) + ')')
+                .text(smartRUtils.shortenConcept(xArrLabel) + ' (' + transformation + ')');
+
+            svg.append('g')
+                .attr('class', 'y axis')
+                .attr('transform', 'translate(' + width + ',' + 0 + ')')
+                .call(d3.svg.axis()
+                    .scale(y)
+                    .ticks(10)
+                    .tickFormat('')
+                    .innerTickSize(width)
+                    .orient('left'));
+
+            svg.append('text')
+                .attr('class', 'axisLabels')
+                .attr('transform', 'translate('  + (width + 10) + ',' + height / 2 + ')rotate(90)')
+                .text(smartRUtils.shortenConcept(yArrLabel) + ' (' + transformation + ')');
+
+            svg.append('g')
+                .attr('class', 'x axis')
+                .attr('transform', 'translate(' + 0 + ',' + height + ')')
+                .call(d3.svg.axis()
+                    .scale(x)
+                    .orient('top'));
+
+            svg.append('g')
+                .attr('class', 'y axis')
+                .attr('transform', 'translate(' + 0 + ',' + 0 + ')')
+                .call(d3.svg.axis()
+                    .scale(y)
+                    .orient('right'));
+
+            function excludeSelection() {
+                var remainingPatientIDs = d3.selectAll('.point:not(.selected)').data().map(function(d) {
+                    return d.patientID;
+                });
+                updateStatistics(remainingPatientIDs, true);
+            }
+
+            function zoomSelection() {
+                if (d3.selectAll('.point.selected').size() < 2) {
+                    alert('Please select at least two elements before zooming!');
+                    return;
+                }
+                var selectedPatientIDs = d3.selectAll('.point.selected').data().map(function(d) { return d.patientID; });
+                updateStatistics(selectedPatientIDs, false, true);
+            }
+
+            var contextMenu = d3.tip()
+                .attr('class', 'd3-tip sr-contextmenu')
+                .offset([-10, 0])
+                .html(function(d) { return d; });
+
+            svg.call(contextMenu);
+
+            function updateSelection() {
+                var extent = brush.extent();
+                var x0 = x.invert(extent[0][0]);
+                var x1 = x.invert(extent[1][0]);
+                var y0 = y.invert(extent[0][1]);
+                var y1 = y.invert(extent[1][1]);
+                svg.selectAll('.point')
+                    .classed('selected', false)
+                    .style('fill', function(d) { return getColor(d.annotation); })
+                    .style('stroke', 'white')
+                    .filter(function(d) {
+                        return x0 <= d.x && d.x <= x1 && y1 <= d.y && d.y <= y0;
+                    })
+                    .classed('selected', true)
+                    .style('fill', 'white')
+                    .style('stroke', function(d) { return getColor(d.annotation); });
+            }
+
+            var brush = d3.svg.brush()
+                .x(d3.scale.identity().domain([0, width]))
+                .y(d3.scale.identity().domain([0, height]))
+                .on('brushend', function() {
+                    contextMenu.hide();
+                    updateSelection();
+                    var selectedPatientIDs = d3.selectAll('.point.selected').data().map(function(d) { return d.patientID; });
+                    updateStatistics(selectedPatientIDs);
+                });
+
+            svg.append('g')
+                .attr('class', 'brush')
+                .on('mousedown', function() {
+                    return d3.event.button === 2 ? d3.event.stopImmediatePropagation() : null;
+                })
+                .call(brush);
+
+            function getColor(annotation) {
+                return annotation && annotation !== 'Default' ? colors[annotations.indexOf(annotation)] : 'black';
+            }
+
+            function updateScatterplot() {
+                var point = svg.selectAll('.point')
+                    .data(points, function(d) { return d.patientID; });
+
+                point.enter()
+                    .append('circle')
+                    .attr('class', 'point')
+                    .attr('cx', function(d) { return x(d.x); })
+                    .attr('cy', function(d) { return y(d.y); })
+                    .attr('r', 5)
+                    .style('fill', function(d) { return getColor(d.annotation); })
+                    .on('mouseover', function(d) {
+                        d3.select(this).style('fill', '#FF0000');
+                        tip.show(smartRUtils.shortenConcept(xArrLabel) + ': ' + d.x + '<br/>' +
+                            smartRUtils.shortenConcept(yArrLabel) + ': ' + d.y + '<br/>' +
+                            'Patient ID: ' + d.patientID + '<br/>' +
+                            (d.annotation ? 'Tag: ' + d.annotation : ''));
+                    })
+                    .on('mouseout', function() {
+                        var p = d3.select(this);
+                        p.style('fill', function(d) {
+                            return p.classed('selected') ? '#FFFFFF' : getColor(d.annotation);
+                        });
+                        tip.hide();
+                    });
+
+                point.exit()
+                    .classed('selected', false)
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('r', 0)
+                    .remove();
+            }
+
+            function updateHistogram() {
+                var bottomHistData = d3.layout.histogram()
+                    .bins(bins)(points.map(function(d) { return d.x; }));
+                var leftHistData = d3.layout.histogram()
+                    .bins(bins)(points.map(function(d) { return d.y; }));
+
+                var bottomHistHeightScale = d3.scale.linear()
+                    .domain([0, Math.max.apply(null, bottomHistData.map(function(d) { return d.y; }))])
+                    .range([1, bottomHistHeight]);
+                var leftHistHeightScale = d3.scale.linear()
+                    .domain([0, Math.max.apply(null, leftHistData.map(function(d) { return d.y; }))])
+                    .range([2, leftHistHeight]);
+
+                var bottomHistGroup = svg.selectAll('.bar.bottom')
+                    .data(Array(bins).fill().map(function(_, i) { return i; }));
+                var bottomHistGroupEnter = bottomHistGroup.enter()
+                    .append('g')
+                    .attr('class', 'bar bottom');
+                var bottomHistGroupExit = bottomHistGroup.exit();
+
+                bottomHistGroupEnter.append('rect')
+                    .attr('y', height + 1);
+                bottomHistGroup.selectAll('rect')
+                    .transition()
+                    .delay(function(d) { return d * 25; })
+                    .duration(animationDuration)
+                    .attr('x', function(d) { return x(bottomHistData[d].x); })
+                    .attr('width', function() { return (x(maxX) - x(minX)) / bins; })
+                    .attr('height', function(d) { return bottomHistHeightScale(bottomHistData[d].y) - 1; });
+                bottomHistGroupExit.selectAll('rect')
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('height', 0);
+
+                bottomHistGroupEnter.append('text')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'middle');
+                bottomHistGroup.selectAll('text')
+                    .text(function(d) { return bottomHistData[d].y || ''; })
+                    .transition()
+                    .delay(function(d) { return d * 25; })
+                    .duration(animationDuration)
+                    .attr('x', function(d) { return x(bottomHistData[d].x) + (x(maxX) - x(minX)) / bins / 2; })
+                    .attr('y', function(d) { return height + bottomHistHeightScale(bottomHistData[d].y) - 10; });
+                bottomHistGroupExit.selectAll('text')
+                    .text('');
+
+                var leftHistGroup = svg.selectAll('.bar.left')
+                    .data(Array(bins).fill().map(function(_, i) { return i; }));
+                var leftHistGroupEnter = leftHistGroup.enter()
+                    .append('g')
+                    .attr('class', 'bar left');
+                var leftHistGroupExit = leftHistGroup.exit();
+
+                leftHistGroupEnter.append('rect');
+                leftHistGroup.selectAll('rect')
+                    .transition()
+                    .delay(function(d) { return d * 25; })
+                    .duration(animationDuration)
+                    .attr('x', function(d) { return - leftHistHeightScale(leftHistData[d].y) + 1; })
+                    .attr('y', function(d) { return y(leftHistData[d].x) - (y(minY) - y(maxY))/ bins; })
+                    .attr('width', function(d) { return leftHistHeightScale(leftHistData[d].y) - 2; })
+                    .attr('height', function() { return (y(minY) - y(maxY))/ bins; });
+                leftHistGroupExit.selectAll('rect')
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('height', 0);
+
+                leftHistGroupEnter.append('text')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'middle');
+                leftHistGroup.selectAll('text')
+                    .text(function(d) { return leftHistData[d].y || ''; })
+                    .transition()
+                    .delay(function(d) { return d * 25; })
+                    .duration(animationDuration)
+                    .attr('x', function(d) { return - leftHistHeightScale(leftHistData[d].y) + 10; })
+                    .attr('y', function(d) { return y(leftHistData[d].x) - (y(minY) - y(maxY))/ bins / 2; });
+                leftHistGroupExit.selectAll('text')
+                    .text('');
+            }
+
+            function updateLegends() {
+                var _LEGEND_LINE_SPACING = 15,
+                    _LEGEND_RECT_SIZE = 10;
+                var text = [
+                    {name: 'Correlation Coefficient: ' + correlation},
+                    {name: 'p-value: ' + pvalue},
+                    {name: 'Method: ' + method},
+                    {name: 'Selected: ' + d3.selectAll('.point.selected').size() || d3.selectAll('.point').size()},
+                    {name: 'Displayed: ' + d3.selectAll('.point').size()}
+                ];
+
+                annotations.forEach(function(annotation) {
+                    text.push({color: getColor(annotation), name: annotation});
+                });
+
+                var legend = svg.selectAll('.legend')
+                    .data(text, function(d) { return d.name; });
+
+                var legendEnter = legend.enter()
+                    .append('g')
+                    .attr('class', 'legend')
+                    .attr('transform', function(d, i) {
+                        return 'translate(' + (width + 40) + ',' + (i * (_LEGEND_RECT_SIZE + _LEGEND_LINE_SPACING)) + ')';
+                    });
+
+                legendEnter.append('text');
+                legendEnter.append('rect');
+
+                legend.select('text')
+                    .attr('x', function(d) { return d.color ? 20 : 0; })
+                    .attr('y', 9)
+                    .text(function(d) { return d.name; });
+
+                legend.select('rect')
+                    .attr('width', _LEGEND_RECT_SIZE)
+                    .attr('height', _LEGEND_RECT_SIZE)
+                    .style('fill', function(d) { return d.color; })
+                    .style('visibility', function(d) { return d.color ? 'visible' : 'hidden'; });
+
+                legend.exit()
+                    .remove();
+            }
+
+            function updateRegressionLine() {
+                var regressionLine = svg.selectAll('.regressionLine')
+                    .data(regLineSlope === 'NA' ? [] : [0], function(d) { return d; });
+                regressionLine.enter()
+                    .append('line')
+                    .attr('class', 'regressionLine')
+                    .on('mouseover', function () {
+                        d3.select(this).attr('stroke', 'red');
+                        tip.show('slope: ' + regLineSlope + '<br/>intercept: ' + regLineYIntercept);
+                    })
+                    .on('mouseout', function () {
+                        d3.select(this).attr('stroke', 'orange');
+                        tip.hide();
+                    });
+
+                var x1 = x(minX),
+                    y1 = y(regLineYIntercept + regLineSlope * minX),
+                    x2 = x(maxX),
+                    y2 = y(regLineYIntercept + regLineSlope * maxX);
+
+                x1 = x1 < 0 ? 0 : x1;
+                x1 = x1 > width ? width : x1;
+
+                x2 = x2 < 0 ? 0 : x2;
+                x2 = x2 > width ? width : x2;
+
+                y1 = y1 < 0 ? 0 : y1;
+                y1 = y1 > height ? height : y1;
+
+                y2 = y2 < 0 ? 0 : y2;
+                y2 = y2 > height ? height : y2;
+
+                regressionLine.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x1)
+                    .attr('y1', y1)
+                    .attr('x2', x2)
+                    .attr('y2', y2);
+
+                regressionLine.exit()
+                    .remove();
+            }
+
+            function reset() {
+                updateStatistics([], true, true);
+            }
+
+            updateScatterplot();
+            updateHistogram();
+            updateRegressionLine();
+            updateLegends();
+        }
+
+    }]);
+
+angular.module('smartRApp')
+    .config(["$stateProvider", function ($stateProvider) {
+        $stateProvider
+            .state('correlation', {
+                parent: 'site',
+                url: '/correlation',
+                views: {
+                    '@': {
+                        templateUrl: 'src/containers/correlation/correlation.html'
+                    },
+                    'content@correlation': {
+                        templateUrl: 'src/containers/correlation/correlation.content.html'
+                    },
+                    'sidebar@correlation': {
+                        templateUrl: 'app/components/sidebar/sidebar.html',
+                        controller: 'SidebarCtrl',
+                        controllerAs: 'vm'
+                    }
+                }
+            });
+    }]);
+
 //# sourceURL=biomarkerSelection.js
 
 'use strict';
@@ -642,6 +1727,7 @@ angular.module('smartRApp').directive('conceptBox', [
                     hleaficon: 'HD',
                     alphaicon: 'LD-categorical',
                     null: 'LD-categorical', // a fix for older tm version without alphaicon
+                    CATEGORICAL_OPTION: 'LD-categorical',
                     valueicon: 'LD-numerical'
                 };
                 var _containsOnlyCorrectType = function() {
@@ -1234,1652 +2320,6 @@ angular.module('smartRApp').directive('workflowWarnings', [
         };
     }
 ]);
-
-//# sourceURL=commonWorkflowService.js
-
-'use strict';
-
-angular.module('smartRApp').factory('commonWorkflowService', ['rServeService', function(rServeService) {
-    var service = {};
-
-    service.initializeWorkflow = function(workflowName, scope) {
-        service.currentScope = scope;
-
-        rServeService.destroyAndStartSession(workflowName);
-    };
-
-    return service;
-
-}]);
-
-//# sourceURL=rServeService.js
-
-'use strict';
-
-angular.module('smartRApp').factory('rServeService', [
-    'smartRUtils',
-    '$q',
-    '$http',
-    'EndpointService',
-    function (smartRUtils, $q, $http, EndpointService) {
-        var baseURL = EndpointService.getMasterEndpoint().url;
-
-        var service = {};
-
-        var NOOP_ABORT = function () {
-        };
-        var TIMEOUT = 10000; // 10 s
-        var CHECK_DELAY = 500; // 0.5 s
-        var SESSION_TOUCH_DELAY = 60000; // 1 min
-
-        /* we only support one session at a time */
-
-        var state = {
-            currentRequestAbort: NOOP_ABORT,
-            sessionId: null,
-            touchTimeout: null // for current session id
-        };
-//headers: {'Authorization': 'xxxyyyzzz'}
-        var workflow = '';
-        /* returns a promise with the session id and
-         * saves the session id for future calls */
-        var authorizationHeader = '';
-        service.startSession = function (name) {
-            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
-            authorizationHeader = authHeaders['Authorization'];
-            baseURL = EndpointService.getMasterEndpoint().url;
-            workflow = name;
-            var request = $http({
-                url: baseURL + '/RSession/create',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                    Accept: "application/hal+json"
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    workflow: workflow
-                }
-            });
-
-            return $q(function (resolve, reject) {
-                request.then(
-                    function (response) {
-                        state.sessionId = response.data.sessionId;
-                        rServeService_scheduleTouch();
-                        resolve();
-                    },
-                    function (response) {
-                        reject(response.statusText);
-                    }
-                );
-            });
-        };
-
-        service.fetchImageResource = function (uri) {
-            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
-            authorizationHeader = authHeaders['Authorization'];
-
-            var deferred = $q.defer();
-
-            var header = {};
-            header.Authorization = authorizationHeader;
-
-            $http({
-                method: 'GET',
-                headers: header,
-                url: uri,
-                responseType: 'arraybuffer',
-                eventHandlers: {
-                    progress: function (e) {
-                        deferred.notify(e);
-                    }
-                }
-            }).then(function (res) {
-                var arr = new Uint8Array(res.data);
-
-                // Convert the int array to a binary string
-                // We have to use apply() as we are converting an *array*
-                // and String.fromCharCode() takes one or more single values, not
-                // an array.
-                var raw = String.fromCharCode.apply(null, arr);
-                var b64 = btoa(raw);
-                var dataURL = "data:image/jpeg;base64," + b64;
-
-                return deferred.resolve(dataURL);
-            }).catch(function (err) {
-                return deferred.reject({
-                    status: this.status,
-                    statusText: xmlHTTP.statusText
-                })
-            });
-
-            return deferred.promise;
-        };
-
-        service.touch = function (sessionId) {
-            if (sessionId !== state.sessionId) {
-                return;
-            }
-
-            var touchRequest = $http({
-                url: baseURL + '/RSession/touch',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    sessionId: sessionId
-                }
-            });
-
-            touchRequest.finally(function () {
-                rServeService_scheduleTouch(); // schedule another
-            });
-        };
-
-        function rServeService_scheduleTouch() {
-            window.clearTimeout(state.touchTimeout);
-            state.touchTimeout = window.setTimeout(function () {
-                service.touch(state.sessionId);
-            }, SESSION_TOUCH_DELAY);
-        }
-
-        service.deleteSessionFiles = function (sessionId) {
-            sessionId = sessionId || state.sessionId;
-
-            return $http({
-                url: baseURL + '/RSession/deleteFiles',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    sessionId: sessionId
-                }
-            });
-        };
-
-        service.destroySession = function (sessionId) {
-            sessionId = sessionId || state.sessionId;
-
-            if (!sessionId) {
-                return;
-            }
-
-            var request = $http({
-                url: baseURL + '/RSession/delete',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    sessionId: sessionId
-                }
-            });
-
-            return request.finally(function () {
-                if (state.sessionId === sessionId) {
-                    service.abandonCurrentSession();
-                }
-            });
-        };
-
-        service.abandonCurrentSession = function () {
-            window.clearTimeout(state.touchTimeout);
-            state.sessionId = null;
-        };
-
-        service.destroyAndStartSession = function (workflowName) {
-            $q.when(service.destroySession()).then(function () {
-                service.startSession(workflowName);
-            });
-        };
-
-        /*
-         * taskData = {
-         *     arguments: { ... },
-         *     taskType: 'fetchData' or name of R script minus .R,
-         *     phase: 'fetch' | 'preprocess' | 'run',
-         * }
-         */
-        service.startScriptExecution = function (taskDataOrig) {
-
-            var taskData = $.extend({}, taskDataOrig); // clone the thing
-            state.currentRequestAbort();
-
-            var canceler = $q.defer();
-            var _httpArg = {
-                url: baseURL + '/ScriptExecution/run',
-                method: 'POST',
-                timeout: canceler.promise,
-                responseType: 'json',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                data: {
-                    sessionId: state.sessionId,
-                    arguments: taskData.arguments,
-                    taskType: taskData.taskType,
-                    workflow: workflow
-                }
-            };
-            console.log(_httpArg);
-            var runRequest = $http(_httpArg);
-
-            runRequest.finally(function () {
-                state.currentRequestAbort = NOOP_ABORT;
-            });
-
-            state.currentRequestAbort = function () {
-                canceler.resolve();
-            };
-
-            /* schedule checks */
-            var promise = $q(function (resolve, reject) {
-                runRequest.then(
-                    function (response) {
-                        if (!response.data) {
-                            console.error('Unexpected response:', response);
-                        }
-                        taskData.executionId = response.data.executionId;
-                        _checkStatus(taskData.executionId, resolve, reject);
-                    },
-                    function (response) {
-                        reject(response.statusText);
-                    }
-                );
-            });
-
-            promise.cancel = function () {
-                // calling this method should by itself resolve the promise
-                state.currentRequestAbort();
-            };
-
-            // no touching necessary when a task is running
-            window.clearTimeout(state.touchTimeout);
-            promise.finally(rServeService_scheduleTouch.bind(this));
-
-            return promise;
-        };
-
-        /* aux function of _startScriptExecution. Needs to follow its contract
-         * with respect to the fail and success result of the promise */
-        function _checkStatus(executionId, resolve, reject) {
-            var canceler = $q.defer();
-            var statusRequest = $http({
-                method: 'GET',
-                timeout: canceler.promise,
-                headers: {
-                    Authorization: authorizationHeader,
-                },
-                url: baseURL + '/ScriptExecution/status' +
-                '?sessionId=' + state.sessionId +
-                '&executionId=' + executionId
-            });
-
-            statusRequest.finally(function () {
-                state.currentRequestAbort = NOOP_ABORT;
-            });
-            state.currentRequestAbort = function () {
-                canceler.resolve();
-            };
-
-            statusRequest.then(
-                function (d) {
-                    if (d.data.state === 'FINISHED') {
-                        d.data.executionId = executionId;
-                        resolve(d.data);
-                    } else if (d.data.state === 'FAILED') {
-                        reject(d.data.result.exception);
-                    } else {
-                        // else still pending
-                        window.setTimeout(function () {
-                            _checkStatus(executionId, resolve, reject);
-                        }, CHECK_DELAY);
-                    }
-                },
-                function (response) {
-                    reject(response.statusText);
-                }
-            );
-        }
-
-        service.downloadJsonFile = function (executionId, filename) {
-            return $http({
-                method: 'GET',
-                url: this.urlForFile(executionId, filename),
-                headers: {
-                    Authorization: authorizationHeader,
-                },
-            });
-        };
-
-
-        service.urlForFile = function (executionId, filename) {
-            return baseURL +
-                '/ScriptExecution/downloadFile?sessionId=' + state.sessionId +
-                '&executionId=' + executionId + '&filename=' + filename;
-        };
-
-        service.loadDataIntoSession = function (conceptKeys, dataConstraints, projection) {
-            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
-            return $q(function (resolve, reject) {
-                smartRUtils.getSubsetIds().then(
-                    function (subsets) {
-                        var _arg = {
-                            conceptKeys: conceptKeys,
-                            resultInstanceIds: subsets,
-                            projection: projection
-                        };
-
-                        if (typeof dataConstraints !== 'undefined') {
-                            _arg.dataConstraints = dataConstraints;
-                        }
-                        console.log(_arg);
-                        service.startScriptExecution({
-                            taskType: 'fetchData',
-                            arguments: _arg
-                        }).then(
-                            resolve,
-                            function (response) {
-                                reject(response);
-                            }
-                        );
-                    },
-                    function () {
-                        reject('Could not create subsets!');
-                    }
-                );
-            });
-        };
-
-        service.executeSummaryStats = function (phase, projection) {
-            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
-            return $q(function (resolve, reject) {
-                service.startScriptExecution({
-                    taskType: 'summary',
-                    arguments: {
-                        phase: phase,
-                        projection: projection // always required, even for low-dim data
-                    }
-                }).then(
-                    function (response) {
-                        if (response.result.artifacts.files.length > 0) {
-                            service.composeSummaryResults(response.result.artifacts.files, response.executionId, phase)
-                                .then(
-                                    function (result) {
-                                        resolve({result: result});
-                                    },
-                                    function (msg) {
-                                        reject(msg.statusText);
-                                    }
-                                );
-                        } else {
-                            resolve({result: {}});
-                        }
-                    },
-                    function (response) {
-                        reject(response);
-                    }
-                );
-            });
-        };
-
-        service.composeSummaryResults = function (files, executionId, phase) {
-            // FIXME: errors from downloadJsonFile do not lead to a reject
-            return $q(function (resolve, reject) {
-                var retObj = {summary: [], allSamples: 0, numberOfRows: 0},
-                    fileExt = {fetch: ['.png', 'json'], preprocess: ['all.png', 'all.json']},
-
-                // find matched items in an array by key
-                    _find = function composeSummaryResults_find(key, array) {
-                        // The variable results needs var in this case (without 'var' a global variable is created)
-                        var results = [];
-                        for (var i = 0; i < array.length; i++) {
-                            if (array[i].search(key) > -1) {
-                                results.push(array[i]);
-                            }
-                        }
-                        return results;
-                    },
-
-                // process each item
-                    _processItem = function composeSummaryResults_processItem(img, json) {
-                        return $q(function (resolve) {
-                            service.downloadJsonFile(executionId, json).then(
-                                function (d) {
-                                    retObj.subsets = d.data.length;
-                                    d.data.forEach(function (subset) {
-                                        retObj.allSamples += subset.numberOfSamples;
-                                        retObj.numberOfRows = subset.totalNumberOfValuesIncludingMissing /
-                                            subset.numberOfSamples;
-                                    });
-                                    resolve({img: service.urlForFile(executionId, img), json: d});
-                                },
-                                function (err) {
-                                    reject(err);
-                                }
-                            );
-                        });
-                    };
-
-                // first identify image and json files
-                var _images = _find(fileExt[phase][0], files),
-                    _jsons = _find(fileExt[phase][1], files);
-
-                // load each json file contents
-                for (var i = 0; i < _images.length; i++) {
-                    retObj.summary.push(_processItem(_images[i], _jsons[i]));
-                }
-
-                $.when.apply($, retObj.summary).then(function () {
-                    resolve(retObj); // when all contents has been loaded
-                });
-            });
-        };
-
-        service.preprocess = function (args) {
-            return $q(function (resolve, reject) {
-                service.startScriptExecution({
-                    taskType: 'preprocess',
-                    arguments: args
-                }).then(
-                    resolve,
-                    function (response) {
-                        reject(response);
-                    }
-                );
-            });
-        };
-
-        return service;
-    }]);
-
-//# sourceURL=smartRUtils.js
-
-'use strict';
-
-angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService', function($q,
-                                                                                           CohortSharingService) {
-
-    var service = {};
-
-    var nodeToKey = function (node) {
-        return node.restObj.key;
-    };
-
-    service.conceptBoxMapToConceptKeys = function smartRUtils_conceptBoxMapToConceptKeys(conceptBoxMap) {
-        var allConcepts = {};
-        Object.keys(conceptBoxMap).forEach(function(group) {
-            var concepts = conceptBoxMap[group].concepts;
-            concepts.forEach(function(concept, idx) {
-                allConcepts[group + '_' + 'n' + idx] = nodeToKey(concept);
-            });
-        });
-        return allConcepts;
-    };
-
-    /**
-     * Creates a CSS safe version of a given string
-     * This should be used consistently across the whole of SmartR to avoid data induced CSS errors
-     *
-     * @param str
-     * @returns {string}
-     */
-    service.makeSafeForCSS = function smartRUtils_makeSafeForCSS(str) {
-        return String(str).replace(/[^a-z0-9]/g, function(s) {
-            var c = s.charCodeAt(0);
-            if (c === 32) {
-                return '-';
-            }
-            if (c >= 65 && c <= 90) {
-                return '_' + s.toLowerCase();
-            }
-            return '__' + ('000' + c.toString(16)).slice(-4);
-        });
-    };
-
-    service.getElementWithoutEventListeners = function(cssSelector) {
-        var element = document.getElementById(cssSelector);
-        var copy = element.cloneNode(true);
-        element.parentNode.replaceChild(copy, element);
-        return copy;
-    };
-
-    service.shortenConcept = function smartRUtils_shortenConcept(concept) {
-        var split = concept.split('\\');
-        split = split.filter(function(str) { return str !== ''; });
-        return split[split.length - 2] + '/' + split[split.length - 1];
-    };
-
-    // Calculate width of text from DOM element or string. By Phil Freo <http://philfreo.com>
-    $.fn.textWidth = function(text, font) {
-        if (!$.fn.textWidth.fakeEl) {
-            $.fn.textWidth.fakeEl = $('<span>').hide().appendTo(document.body);
-        }
-        $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
-        return $.fn.textWidth.fakeEl.width();
-    };
-
-    service.getTextWidth = function(text, font) {
-        return $.fn.textWidth(text, font);
-    };
-
-    /**
-     * Executes callback with scroll position when SmartR mainframe is scrolled
-     * @param function
-     */
-    service.callOnScroll = function(callback) {
-        $('#sr-index').parent().scroll(function() {
-            var scrollPos = $(this).scrollTop();
-            callback(scrollPos);
-        });
-    };
-
-    service.prepareWindowSize = function(width, height) {
-        $('#heim-tabs').css('min-width', parseInt(width) + 25);
-        $('#heim-tabs').css('min-height', parseInt(height) + 25);
-    };
-
-    /**
-    * removes all kind of elements that might live out of the viz directive (e.g. tooltips, contextmenu, ...)
-    */
-    service.cleanUp = function() {
-        $('.d3-tip').remove();
-    };
-
-    service.countCohorts = function() {
-        return CohortSharingService.getSelection().length;
-    };
-
-    service.getSubsetIds = function smartRUtil_getSubsetIds() {
-        var defer = $q.defer();
-        defer.resolve(CohortSharingService.getSelection());
-        return defer.promise;
-    };
-
-    return service;
-}]);
-
-
-'use strict';
-
-angular.module('smartRApp').controller('BoxplotController', [
-    '$scope',
-    'smartRUtils',
-    'commonWorkflowService',
-    function($scope, smartRUtils, commonWorkflowService) {
-
-        commonWorkflowService.initializeWorkflow('boxplot', $scope);
-
-        $scope.fetch = {
-            running: false,
-            disabled: false,
-            loaded: false,
-            conceptBoxes: {
-                datapoints: {concepts: [], valid: false}
-            }
-        };
-
-        $scope.runAnalysis = {
-            running: false,
-            disabled: true,
-            scriptResults: {},
-            params: {}
-        };
-
-        $scope.$watchGroup(['fetch.running', 'runAnalysis.running'],
-            function(newValues) {
-                var fetchRunning = newValues[0],
-                    runAnalysisRunning = newValues[1];
-
-                // clear old results
-                if (fetchRunning) {
-                    $scope.runAnalysis.scriptResults = {};
-                }
-
-                // disable tabs when certain criteria are not met
-                $scope.fetch.disabled = runAnalysisRunning;
-                $scope.runAnalysis.disabled = fetchRunning || !$scope.fetch.loaded;
-            }
-        );
-
-    }]);
-
-
-angular.module('smartRApp').directive('boxplot', [
-    'smartRUtils',
-    'rServeService',
-    '$rootScope',
-    function(smartRUtils, rServeService, $rootScope) {
-
-        return {
-            restrict: 'E',
-            scope: {
-                data: '=',
-                width: '@',
-                height: '@'
-            },
-            templateUrl:  'src/containers/templates/boxplot.html',
-            link: function (scope, element) {
-                var template_ctrl = element.children()[0],
-                    template_viz = element.children()[1];
-                /**
-                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
-                 */
-                scope.$watch('data', function () {
-                    $(template_viz).empty();
-                    if (! $.isEmptyObject(scope.data)) {
-                        smartRUtils.prepareWindowSize(scope.width, scope.height);
-                        scope.showControls = true;
-                        createBoxplot(scope, template_viz, template_ctrl);
-                    }
-                });
-            }
-        };
-
-        function createBoxplot(scope, root) {
-            var concept = '',
-                globalMin = Number.MIN_VALUE,
-                globalMax = Number.MAX_VALUE,
-                categories = [],
-                excludedPatientIDs = [],
-                useLog = false;
-            function setData(data) {
-                concept = data.concept[0];
-                globalMin = data.globalMin[0];
-                globalMax = data.globalMax[0];
-                categories = data['Subset 2'] ? ['Subset 1', 'Subset 2'] : ['Subset 1'];
-                excludedPatientIDs = data.excludedPatientIDs;
-                useLog = data.useLog[0];
-            }
-            setData(scope.data);
-
-            var removeBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-remove-btn');
-            removeBtn.addEventListener('click', removeOutliers);
-
-            var resetBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn');
-            resetBtn.addEventListener('click', reset);
-
-            var kdeCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-kde-check');
-            kdeCheck.addEventListener('change', function() { swapKDE(kdeCheck.checked); });
-            kdeCheck.checked = false;
-
-            var jitterCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-jitter-check');
-            jitterCheck.addEventListener('change', function() { swapJitter(jitterCheck.checked); });
-            jitterCheck.checked = false;
-
-            var logCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-log-check');
-            logCheck.checked = useLog;
-            logCheck.addEventListener('change', function() { swapLog(logCheck.checked); });
-
-            var animationDuration = 1000;
-
-            var width = parseInt(scope.width);
-            var height = parseInt(scope.height);
-            var margin = {top: 20, right: 60, bottom: 200, left: 280};
-
-            var boxWidth = 0.12 * width;
-            var whiskerLength = boxWidth / 6;
-
-            var colorScale = d3.scale.quantile()
-                .range(['rgb(158,1,66)', 'rgb(213,62,79)', 'rgb(244,109,67)', 'rgb(253,174,97)', 'rgb(254,224,139)', 'rgb(255,255,191)', 'rgb(230,245,152)', 'rgb(171,221,164)', 'rgb(102,194,165)', 'rgb(50,136,189)', 'rgb(94,79,162)']);
-
-            var boxplot = d3.select(root).append('svg')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .append('g')
-                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
-
-            var x = d3.scale.ordinal()
-                .domain(categories)
-                .rangeBands([0, width], 1, 0.5);
-
-            var y = d3.scale.linear()
-                .domain([globalMin, globalMax])
-                .range([height, 0]);
-
-            var yAxis = d3.svg.axis()
-                .scale(y)
-                .orient('left');
-
-            var xAxis = d3.svg.axis()
-                .scale(x)
-                .orient('bottom');
-
-            boxplot.append('g')
-                .attr('class', 'y axis')
-                .attr('transform', 'translate(' + 0 + ',' + 0 + ')')
-                .call(yAxis);
-
-            boxplot.append('g')
-                .attr('class', 'x axis')
-                .attr('transform', 'translate(' + 0 + ',' + (height + 20) + ')')
-                .call(xAxis)
-                .selectAll('text')
-                .attr('dy', '.35em')
-                .attr('transform', 'translate(' + 0 + ',' + 5 + ')rotate(45)')
-                .style('text-anchor', 'start');
-
-            boxplot.append('text')
-                .attr('transform', 'translate(' + (-40) + ',' + (height / 2) + ')rotate(-90)')
-                .attr('text-anchor', 'middle')
-                .text(smartRUtils.shortenConcept(concept) + (useLog ? ' (log2)' : ''));
-
-            var tip = d3.tip()
-                .attr('class', 'd3-tip')
-                .offset([-10, 0])
-                .html(function(d) { return d; });
-
-            boxplot.call(tip);
-
-            var brush = d3.svg.brush()
-                .x(d3.scale.identity().domain([0, width]))
-                .y(d3.scale.identity().domain([-5, height + 5]))
-                .on('brush', function () {
-                    contextMenu.hide();
-                    updateSelection();
-                });
-
-            boxplot.append('g')
-                .attr('class', 'brush')
-                .on('mousedown', function () {
-                    if (d3.event.button === 2) {
-                        d3.event.stopImmediatePropagation();
-                    }
-                })
-                .call(brush);
-
-            var contextMenu = d3.tip()
-                .attr('class', 'd3-tip sr-contextmenu')
-                .html(function(d) { return d; });
-
-            boxplot.call(contextMenu);
-
-            function _addEventListeners() {
-                smartRUtils.getElementWithoutEventListeners('sr-boxplot-exclude-btn').addEventListener('click', function() {
-                    contextMenu.hide();
-                    excludeSelection();
-                });
-
-                smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn-2').addEventListener('click', function() {
-                    contextMenu.hide();
-                    reset();
-                });
-            }
-
-            boxplot.on('contextmenu', function () {
-                d3.event.preventDefault();
-                contextMenu.show('<input id="sr-boxplot-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
-                    '<input id="sr-boxplot-reset-btn-2" value="Reset" class="sr-ctx-menu-btn">');
-                _addEventListeners();
-            });
-
-        var currentSelection;
-        function updateSelection() {
-            d3.selectAll('.point').classed('brushed', false);
-            var extent = brush.extent();
-            var left = extent[0][0],
-                top = extent[0][1],
-                right = extent[1][0],
-                bottom = extent[1][1];
-            currentSelection = d3.selectAll('.point')
-                .filter(function (d) {
-                    var point = d3.select(this);
-                    return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
-                })
-                .classed('brushed', true)
-                .data()
-                .map(function(d) { return d.patientID; });
-        }
-
-            function excludeSelection() {
-                excludedPatientIDs = excludedPatientIDs.concat(currentSelection);
-                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
-
-                rServeService.startScriptExecution({
-                    taskType: 'run',
-                    arguments: settings
-                }).then(
-                    function (response) {
-                        removePlot();
-                        scope.data = JSON.parse(response.result.artifacts.value);
-                    },
-                    function (response) {
-                        console.error(response);
-                    }
-                );
-            }
-
-            function removePlot() {
-                d3.select(root).selectAll('*').remove();
-                d3.selectAll('.d3-tip').remove();
-            }
-
-        function removeOutliers() {
-            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
-            if (currentSelection) { excludeSelection(); }
-        }
-
-            function kernelDensityEstimator(kernel, x) {
-                return function (sample) {
-                    return x.map(function (x) {
-                        return [x, d3.mean(sample, function (v) {
-                            return kernel(x - v);
-                        })];
-                    });
-                };
-            }
-
-            function epanechnikovKernel(scale) {
-                return function (u) {
-                    return Math.abs(u /= scale) <= 1 ? 0.75 * (1 - u * u) / scale : 0;
-                };
-            }
-
-            // function gaussKernel(scale) {
-            //     return function (u) {
-            //         return Math.exp(-u * u / 2) / Math.sqrt(2 * Math.PI) / scale;
-            //     };
-            // }
-
-            function swapKDE(checked) {
-                if (!checked) {
-                    d3.selectAll('.line').attr('visibility', 'hidden');
-                } else {
-                    d3.selectAll('.line').attr('visibility', 'visible');
-                }
-            }
-
-            function shortenNodeLabel(label) {
-                label = label.replace(/\W+/g, '');
-                return label;
-            }
-
-            var jitterWidth = 1.0;
-
-            function swapJitter() {
-                categories.forEach(function(category) {
-                    d3.selectAll('.point.' + smartRUtils.makeSafeForCSS(shortenNodeLabel(category)))
-                        .transition()
-                        .duration(animationDuration)
-                        .attr('cx', function(d) {
-                            return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
-                        });
-                });
-            }
-
-            function swapLog() {
-                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
-                rServeService.startScriptExecution({
-                    taskType: 'run',
-                    arguments: settings
-                }).then(
-                    function (response) {
-                        removePlot();
-                        scope.data = JSON.parse(response.result.artifacts.value);
-                    },
-                    function (response) {
-                        console.error(response);
-                    }
-                );
-            }
-
-            var boxes = {};
-            categories.forEach(function(category) {
-                boxes[category] = boxplot.append('g');
-                var params = scope.data[category];
-                createBox(params, category, boxes[category]);
-            });
-
-            function createBox(params, category, box) {
-                var boxLabel = shortenNodeLabel(category);
-                colorScale.domain(d3.extent(y.domain()));
-
-                var whisker = box.selectAll('.whisker')
-                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
-                        return boxLabel + '-whisker-' + i;
-                    });
-
-                whisker.enter()
-                    .append('line')
-                    .attr('class', 'whisker');
-
-                whisker.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x(category) - whiskerLength / 2)
-                    .attr('y1', function (d) { return y(d); })
-                    .attr('x2', x(category) + whiskerLength / 2)
-                    .attr('y2', function (d) { return y(d); });
-
-                var whiskerLabel = box.selectAll('.whiskerLabel')
-                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
-                        return boxLabel + '-whiskerLabel-' + i;
-                    });
-
-                whiskerLabel.enter()
-                    .append('text')
-                    .attr('class', 'whiskerLabel boxplotValue');
-
-                whiskerLabel.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) + whiskerLength / 2)
-                    .attr('y', function (d) { return y(d); })
-                    .attr('dx', '.35em')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'start')
-                    .text(function (d) { return d; });
-
-                var hingeLength = boxWidth;
-                var hinge = box.selectAll('.hinge')
-                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
-                        return boxLabel + '-hinge-' + i;
-                    });
-
-                hinge.enter()
-                    .append('line')
-                    .attr('class', 'hinge');
-
-                hinge.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x(category) - hingeLength / 2)
-                    .attr('y1', function (d) { return y(d); })
-                    .attr('x2', x(category) + hingeLength / 2)
-                    .attr('y2', function (d) { return y(d); });
-
-                var hingeLabel = box.selectAll('.hingeLabel')
-                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
-                        return boxLabel + '-hingeLabel-' + i;
-                    });
-
-                hingeLabel.enter()
-                    .append('text')
-                    .attr('class', 'hingeLabel boxplotValue');
-
-                hingeLabel.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) - hingeLength / 2)
-                    .attr('y', function (d) { return y(d); })
-                    .attr('dx', '-.35em')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'end')
-                    .text(function (d) { return d; });
-
-                var connection = box.selectAll('.connection')
-                    .data([[params.upperWhisker, params.upperHinge], [params.lowerWhisker, params.lowerHinge]],
-                        function (d, i) { return boxLabel + '-connection-' + i; });
-
-                connection.enter()
-                    .append('line')
-                    .attr('class', 'connection');
-
-                connection.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x(category))
-                    .attr('y1', function (d) { return y(d[0]); })
-                    .attr('x2', x(category))
-                    .attr('y2', function (d) { return y(d[1]); });
-
-                var upperBox = box.selectAll('.box.upper')
-                    .data(params.upperHinge, function (d) { return d; });
-
-                upperBox.enter()
-                    .append('rect')
-                    .attr('class', 'box upper');
-
-                upperBox.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) - hingeLength / 2)
-                    .attr('y', y(params.upperHinge))
-                    .attr('height', Math.abs(y(params.upperHinge) - y(params.median)))
-                    .attr('width', hingeLength);
-
-                var lowerBox = box.selectAll('.box.lower')
-                    .data(params.lowerHinge, function (d) { return d; });
-
-                lowerBox.enter()
-                    .append('rect')
-                    .attr('class', 'box lower');
-
-                lowerBox.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) - hingeLength / 2)
-                    .attr('y', y(params.median))
-                    .attr('height', Math.abs(y(params.median) - y(params.lowerHinge)))
-                    .attr('width', hingeLength);
-
-                var medianLabel = box.selectAll('.medianLabel')
-                    .data(params.median, function (d) { return d;});
-
-                medianLabel.enter()
-                    .append('text')
-                    .attr('class', 'medianLabel boxplotValue');
-
-                medianLabel.transition()
-                    .duration(animationDuration)
-                    .attr('x', x(category) + hingeLength / 2)
-                    .attr('y', function () { return y(params.median); })
-                    .attr('dx', '.35em')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'start')
-                    .text(params.median);
-
-                var point = box.selectAll('.point')
-                    .data(params.rawData, function (d) { return boxLabel + '-' + d.patientID; });
-
-                point.enter()
-                    .append('circle')
-                    .attr('cx', function (d) {
-                        return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
-                    })
-                    .attr('r', 0)
-                    .attr('fill', function (d) { return colorScale(d.value); })
-                    .on('mouseover', function (d) {
-                        tip.show('Value: ' + d.value + '</br>' +
-                            'PatientID: ' + d.patientID + '</br>' +
-                            'Outlier: ' + d.outlier);
-                    })
-                    .on('mouseout', function () {
-                        tip.hide();
-                    });
-
-                point
-                    .attr('class', function (d) {
-                        return 'point patientID-' + smartRUtils.makeSafeForCSS(d.patientID) +
-                            (d.outlier ? ' outlier ' : ' ') + smartRUtils.makeSafeForCSS(boxLabel);
-                    }) // This is here and not in the .enter() because points might become outlier on removal of other points
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('cy', function (d) { return y(d.value); })
-                    .attr('r', 3);
-
-                point.exit()
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('r', 0)
-                    .remove();
-
-                var yCopy = y.copy();
-                yCopy.domain([params.lowerWhisker, params.upperWhisker]);
-                var kde = kernelDensityEstimator(epanechnikovKernel(6), yCopy.ticks(100));
-                var values = params.rawData.map(function (d) { return d.value; });
-                var estFun = kde(values);
-                var kdeDomain = d3.extent(estFun, function (d) { return d[1]; });
-                var kdeScale = d3.scale.linear()
-                    .domain(kdeDomain)
-                    .range([0, boxWidth / 2]);
-                var lineGen = d3.svg.line()
-                    .x(function (d) { return x(category) - kdeScale(d[1]); })
-                    .y(function (d) { return y(d[0]); });
-
-                box.append('path')
-                    .attr('class', 'line')
-                    .attr('visibility', 'hidden')
-                    .datum(estFun)
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('d', lineGen);
-            }
-
-            function removeBrush() {
-                d3.selectAll('.brush')
-                    .call(brush.clear());
-            }
-
-            function reset() {
-                removeBrush();
-                excludedPatientIDs = [];
-                currentSelection = [];
-                excludeSelection(); // Abusing the method because I can
-            }
-
-        }
-
-    }]);
-
-
-angular.module('smartRApp')
-    .config(["$stateProvider", function ($stateProvider) {
-        $stateProvider
-            .state('boxplot', {
-                parent: 'site',
-                url: '/boxplot',
-                views: {
-                    '@': {
-                        templateUrl: 'src/containers/boxplot/boxplot.html'
-                    },
-                    'content@boxplot': {
-                        templateUrl: 'src/containers/boxplot/boxplot.content.html',
-                        controller: 'BoxplotController',
-                        controllerAs: 'vm'
-                    },
-                    'sidebar@boxplot': {
-                        templateUrl: 'app/components/sidebar/sidebar.html',
-                        controller: 'SidebarCtrl',
-                        controllerAs: 'vm'
-                    }
-                }
-            });
-    }]);
-
-angular.module('smartRApp').directive('correlationPlot', [
-    'smartRUtils',
-    'rServeService',
-    function(smartRUtils, rServeService) {
-
-        return {
-            restrict: 'E',
-            scope: {
-                data: '=',
-                width: '@',
-                height: '@'
-            },
-            link: function (scope, element) {
-
-                /**
-                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
-                 */
-                scope.$watch('data', function() {
-                    $(element[0]).empty();
-                    if (! $.isEmptyObject(scope.data)) {
-                        smartRUtils.prepareWindowSize(scope.width, scope.height);
-                        createCorrelationViz(scope, element[0]);
-                    }
-                });
-            }
-        };
-
-        function createCorrelationViz(scope, root) {
-            var animationDuration = 500;
-            var bins = 10;
-            var w = parseInt(scope.width);
-            var h = parseInt(scope.height);
-            var margin = {top: 20, right: 250, bottom: h / 4 + 230, left: w / 4};
-            var width = w * 3 / 4 - margin.left - margin.right;
-            var height = h * 3 / 4 - margin.top - margin.bottom;
-            var bottomHistHeight = margin.bottom;
-            var leftHistHeight = margin.left;
-            var colors = ['#33FF33', '#3399FF', '#CC9900', '#CC99FF', '#FFFF00', 'blue'];
-            var x = d3.scale.linear()
-                .domain(d3.extent(scope.data.points, function(d) { return d.x; }))
-                .range([0, width]);
-            var y = d3.scale.linear()
-                .domain(d3.extent(scope.data.points, function(d) { return d.y; }))
-                .range([height, 0]);
-
-            var annotations = scope.data.annotations.sort();
-            for (var i = 0; i < annotations.length; i++) {
-                var annotation = annotations[i];
-                if (annotation === '') {
-                    annotations[i] = 'Default';
-                }
-            }
-
-            var xArrLabel = scope.data.xArrLabel[0];
-            var yArrLabel = scope.data.yArrLabel[0];
-
-            var correlation,
-                pvalue,
-                regLineSlope,
-                regLineYIntercept,
-                patientIDs,
-                points,
-                method,
-                transformation,
-                minX,
-                maxX,
-                minY,
-                maxY;
-            function setData(data) {
-                correlation = data.correlation[0];
-                pvalue = data.pvalue[0];
-                regLineSlope = data.regLineSlope[0];
-                regLineYIntercept = data.regLineYIntercept[0];
-                method = data.method[0];
-                transformation = data.transformation[0];
-                patientIDs = data.patientIDs;
-                points = data.points;
-                var xValues =  data.points.map(function(d) { return d.x; });
-                var yValues =  data.points.map(function(d) { return d.y; });
-                minX = Math.min.apply(null, xValues);
-                minY = Math.min.apply(null, yValues);
-                maxX = Math.max.apply(null, xValues);
-                maxY = Math.max.apply(null, yValues);
-            }
-
-            setData(scope.data);
-
-            function updateStatistics(patientIDs, scatterUpdate, init) {
-                if (! init) {
-                    patientIDs = patientIDs.length !== 0 ? patientIDs : d3.selectAll('.point').data().map(function(d) {
-                        return d.patientID;
-                    });
-                }
-                var args = { method: method, transformation: transformation, selectedPatientIDs: patientIDs };
-
-                rServeService.startScriptExecution({
-                    taskType: 'run',
-                    arguments: args
-                }).then(
-                    function (response) {
-                        var results = JSON.parse(response.result.artifacts.value);
-                        if (init) {
-                            removePlot();
-                            scope.data = results;
-                        } else {
-                            setData(results);
-                            if (scatterUpdate) {
-                                updateScatterplot();
-                            }
-                            updateRegressionLine();
-                            updateLegends();
-                            updateHistogram();
-                        }
-                    },
-                    function (response) {
-                        console.error(response);
-                    }
-                );
-            }
-
-            function removePlot() {
-                d3.select(root).selectAll('*').remove();
-                d3.selectAll('.d3-tip').remove();
-            }
-
-            var svg = d3.select(root).append('svg')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .append('g')
-                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
-                .on('contextmenu', function() {
-                    d3.event.preventDefault();
-                    contextMenu.show('<input id="sr-correlation-zoom-btn" value="Zoom" class="sr-ctx-menu-btn"><br/>' +
-                                     '<input id="sr-correlation-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
-                                     '<input id="sr-correlation-reset-btn" value="Reset" class="sr-ctx-menu-btn">');
-                    _addEventListeners();
-                });
-
-            function _addEventListeners() {
-                smartRUtils.getElementWithoutEventListeners('sr-correlation-zoom-btn').addEventListener('click', function() {
-                    contextMenu.hide();
-                    zoomSelection();
-                });
-                smartRUtils.getElementWithoutEventListeners('sr-correlation-exclude-btn').addEventListener('click', function() {
-                    contextMenu.hide();
-                    excludeSelection();
-                });
-                smartRUtils.getElementWithoutEventListeners('sr-correlation-reset-btn').addEventListener('click', function() {
-                    contextMenu.hide();
-                    reset();
-                });
-            }
-
-            var tip = d3.tip()
-                .attr('class', 'd3-tip')
-                .offset([-10, 0])
-                .html(function(d) { return d; });
-
-            svg.call(tip);
-
-            svg.append('g')
-                .attr('class', 'x axis')
-                .attr('transform', 'translate(0, 0)')
-                .call(d3.svg.axis()
-                    .scale(x)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(height)
-                    .orient('bottom'));
-
-            svg.append('text')
-                .attr('class', 'axisLabels')
-                .attr('transform', 'translate(' + width / 2 + ',' + (- 10) + ')')
-                .text(smartRUtils.shortenConcept(xArrLabel) + ' (' + transformation + ')');
-
-            svg.append('g')
-                .attr('class', 'y axis')
-                .attr('transform', 'translate(' + width + ',' + 0 + ')')
-                .call(d3.svg.axis()
-                    .scale(y)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(width)
-                    .orient('left'));
-
-            svg.append('text')
-                .attr('class', 'axisLabels')
-                .attr('transform', 'translate('  + (width + 10) + ',' + height / 2 + ')rotate(90)')
-                .text(smartRUtils.shortenConcept(yArrLabel) + ' (' + transformation + ')');
-
-            svg.append('g')
-                .attr('class', 'x axis')
-                .attr('transform', 'translate(' + 0 + ',' + height + ')')
-                .call(d3.svg.axis()
-                    .scale(x)
-                    .orient('top'));
-
-            svg.append('g')
-                .attr('class', 'y axis')
-                .attr('transform', 'translate(' + 0 + ',' + 0 + ')')
-                .call(d3.svg.axis()
-                    .scale(y)
-                    .orient('right'));
-
-            function excludeSelection() {
-                var remainingPatientIDs = d3.selectAll('.point:not(.selected)').data().map(function(d) {
-                    return d.patientID;
-                });
-                updateStatistics(remainingPatientIDs, true);
-            }
-
-            function zoomSelection() {
-                if (d3.selectAll('.point.selected').size() < 2) {
-                    alert('Please select at least two elements before zooming!');
-                    return;
-                }
-                var selectedPatientIDs = d3.selectAll('.point.selected').data().map(function(d) { return d.patientID; });
-                updateStatistics(selectedPatientIDs, false, true);
-            }
-
-            var contextMenu = d3.tip()
-                .attr('class', 'd3-tip sr-contextmenu')
-                .offset([-10, 0])
-                .html(function(d) { return d; });
-
-            svg.call(contextMenu);
-
-            function updateSelection() {
-                var extent = brush.extent();
-                var x0 = x.invert(extent[0][0]);
-                var x1 = x.invert(extent[1][0]);
-                var y0 = y.invert(extent[0][1]);
-                var y1 = y.invert(extent[1][1]);
-                svg.selectAll('.point')
-                    .classed('selected', false)
-                    .style('fill', function(d) { return getColor(d.annotation); })
-                    .style('stroke', 'white')
-                    .filter(function(d) {
-                        return x0 <= d.x && d.x <= x1 && y1 <= d.y && d.y <= y0;
-                    })
-                    .classed('selected', true)
-                    .style('fill', 'white')
-                    .style('stroke', function(d) { return getColor(d.annotation); });
-            }
-
-            var brush = d3.svg.brush()
-                .x(d3.scale.identity().domain([0, width]))
-                .y(d3.scale.identity().domain([0, height]))
-                .on('brushend', function() {
-                    contextMenu.hide();
-                    updateSelection();
-                    var selectedPatientIDs = d3.selectAll('.point.selected').data().map(function(d) { return d.patientID; });
-                    updateStatistics(selectedPatientIDs);
-                });
-
-            svg.append('g')
-                .attr('class', 'brush')
-                .on('mousedown', function() {
-                    return d3.event.button === 2 ? d3.event.stopImmediatePropagation() : null;
-                })
-                .call(brush);
-
-            function getColor(annotation) {
-                return annotation && annotation !== 'Default' ? colors[annotations.indexOf(annotation)] : 'black';
-            }
-
-            function updateScatterplot() {
-                var point = svg.selectAll('.point')
-                    .data(points, function(d) { return d.patientID; });
-
-                point.enter()
-                    .append('circle')
-                    .attr('class', 'point')
-                    .attr('cx', function(d) { return x(d.x); })
-                    .attr('cy', function(d) { return y(d.y); })
-                    .attr('r', 5)
-                    .style('fill', function(d) { return getColor(d.annotation); })
-                    .on('mouseover', function(d) {
-                        d3.select(this).style('fill', '#FF0000');
-                        tip.show(smartRUtils.shortenConcept(xArrLabel) + ': ' + d.x + '<br/>' +
-                            smartRUtils.shortenConcept(yArrLabel) + ': ' + d.y + '<br/>' +
-                            'Patient ID: ' + d.patientID + '<br/>' +
-                            (d.annotation ? 'Tag: ' + d.annotation : ''));
-                    })
-                    .on('mouseout', function() {
-                        var p = d3.select(this);
-                        p.style('fill', function(d) {
-                            return p.classed('selected') ? '#FFFFFF' : getColor(d.annotation);
-                        });
-                        tip.hide();
-                    });
-
-                point.exit()
-                    .classed('selected', false)
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('r', 0)
-                    .remove();
-            }
-
-            function updateHistogram() {
-                var bottomHistData = d3.layout.histogram()
-                    .bins(bins)(points.map(function(d) { return d.x; }));
-                var leftHistData = d3.layout.histogram()
-                    .bins(bins)(points.map(function(d) { return d.y; }));
-
-                var bottomHistHeightScale = d3.scale.linear()
-                    .domain([0, Math.max.apply(null, bottomHistData.map(function(d) { return d.y; }))])
-                    .range([1, bottomHistHeight]);
-                var leftHistHeightScale = d3.scale.linear()
-                    .domain([0, Math.max.apply(null, leftHistData.map(function(d) { return d.y; }))])
-                    .range([2, leftHistHeight]);
-
-                var bottomHistGroup = svg.selectAll('.bar.bottom')
-                    .data(Array(bins).fill().map(function(_, i) { return i; }));
-                var bottomHistGroupEnter = bottomHistGroup.enter()
-                    .append('g')
-                    .attr('class', 'bar bottom');
-                var bottomHistGroupExit = bottomHistGroup.exit();
-
-                bottomHistGroupEnter.append('rect')
-                    .attr('y', height + 1);
-                bottomHistGroup.selectAll('rect')
-                    .transition()
-                    .delay(function(d) { return d * 25; })
-                    .duration(animationDuration)
-                    .attr('x', function(d) { return x(bottomHistData[d].x); })
-                    .attr('width', function() { return (x(maxX) - x(minX)) / bins; })
-                    .attr('height', function(d) { return bottomHistHeightScale(bottomHistData[d].y) - 1; });
-                bottomHistGroupExit.selectAll('rect')
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('height', 0);
-
-                bottomHistGroupEnter.append('text')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'middle');
-                bottomHistGroup.selectAll('text')
-                    .text(function(d) { return bottomHistData[d].y || ''; })
-                    .transition()
-                    .delay(function(d) { return d * 25; })
-                    .duration(animationDuration)
-                    .attr('x', function(d) { return x(bottomHistData[d].x) + (x(maxX) - x(minX)) / bins / 2; })
-                    .attr('y', function(d) { return height + bottomHistHeightScale(bottomHistData[d].y) - 10; });
-                bottomHistGroupExit.selectAll('text')
-                    .text('');
-
-                var leftHistGroup = svg.selectAll('.bar.left')
-                    .data(Array(bins).fill().map(function(_, i) { return i; }));
-                var leftHistGroupEnter = leftHistGroup.enter()
-                    .append('g')
-                    .attr('class', 'bar left');
-                var leftHistGroupExit = leftHistGroup.exit();
-
-                leftHistGroupEnter.append('rect');
-                leftHistGroup.selectAll('rect')
-                    .transition()
-                    .delay(function(d) { return d * 25; })
-                    .duration(animationDuration)
-                    .attr('x', function(d) { return - leftHistHeightScale(leftHistData[d].y) + 1; })
-                    .attr('y', function(d) { return y(leftHistData[d].x) - (y(minY) - y(maxY))/ bins; })
-                    .attr('width', function(d) { return leftHistHeightScale(leftHistData[d].y) - 2; })
-                    .attr('height', function() { return (y(minY) - y(maxY))/ bins; });
-                leftHistGroupExit.selectAll('rect')
-                    .transition()
-                    .duration(animationDuration)
-                    .attr('height', 0);
-
-                leftHistGroupEnter.append('text')
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', 'middle');
-                leftHistGroup.selectAll('text')
-                    .text(function(d) { return leftHistData[d].y || ''; })
-                    .transition()
-                    .delay(function(d) { return d * 25; })
-                    .duration(animationDuration)
-                    .attr('x', function(d) { return - leftHistHeightScale(leftHistData[d].y) + 10; })
-                    .attr('y', function(d) { return y(leftHistData[d].x) - (y(minY) - y(maxY))/ bins / 2; });
-                leftHistGroupExit.selectAll('text')
-                    .text('');
-            }
-
-            function updateLegends() {
-                var _LEGEND_LINE_SPACING = 15,
-                    _LEGEND_RECT_SIZE = 10;
-                var text = [
-                    {name: 'Correlation Coefficient: ' + correlation},
-                    {name: 'p-value: ' + pvalue},
-                    {name: 'Method: ' + method},
-                    {name: 'Selected: ' + d3.selectAll('.point.selected').size() || d3.selectAll('.point').size()},
-                    {name: 'Displayed: ' + d3.selectAll('.point').size()}
-                ];
-
-                annotations.forEach(function(annotation) {
-                    text.push({color: getColor(annotation), name: annotation});
-                });
-
-                var legend = svg.selectAll('.legend')
-                    .data(text, function(d) { return d.name; });
-
-                var legendEnter = legend.enter()
-                    .append('g')
-                    .attr('class', 'legend')
-                    .attr('transform', function(d, i) {
-                        return 'translate(' + (width + 40) + ',' + (i * (_LEGEND_RECT_SIZE + _LEGEND_LINE_SPACING)) + ')';
-                    });
-
-                legendEnter.append('text');
-                legendEnter.append('rect');
-
-                legend.select('text')
-                    .attr('x', function(d) { return d.color ? 20 : 0; })
-                    .attr('y', 9)
-                    .text(function(d) { return d.name; });
-
-                legend.select('rect')
-                    .attr('width', _LEGEND_RECT_SIZE)
-                    .attr('height', _LEGEND_RECT_SIZE)
-                    .style('fill', function(d) { return d.color; })
-                    .style('visibility', function(d) { return d.color ? 'visible' : 'hidden'; });
-
-                legend.exit()
-                    .remove();
-            }
-
-            function updateRegressionLine() {
-                var regressionLine = svg.selectAll('.regressionLine')
-                    .data(regLineSlope === 'NA' ? [] : [0], function(d) { return d; });
-                regressionLine.enter()
-                    .append('line')
-                    .attr('class', 'regressionLine')
-                    .on('mouseover', function () {
-                        d3.select(this).attr('stroke', 'red');
-                        tip.show('slope: ' + regLineSlope + '<br/>intercept: ' + regLineYIntercept);
-                    })
-                    .on('mouseout', function () {
-                        d3.select(this).attr('stroke', 'orange');
-                        tip.hide();
-                    });
-
-                var x1 = x(minX),
-                    y1 = y(regLineYIntercept + regLineSlope * minX),
-                    x2 = x(maxX),
-                    y2 = y(regLineYIntercept + regLineSlope * maxX);
-
-                x1 = x1 < 0 ? 0 : x1;
-                x1 = x1 > width ? width : x1;
-
-                x2 = x2 < 0 ? 0 : x2;
-                x2 = x2 > width ? width : x2;
-
-                y1 = y1 < 0 ? 0 : y1;
-                y1 = y1 > height ? height : y1;
-
-                y2 = y2 < 0 ? 0 : y2;
-                y2 = y2 > height ? height : y2;
-
-                regressionLine.transition()
-                    .duration(animationDuration)
-                    .attr('x1', x1)
-                    .attr('y1', y1)
-                    .attr('x2', x2)
-                    .attr('y2', y2);
-
-                regressionLine.exit()
-                    .remove();
-            }
-
-            function reset() {
-                updateStatistics([], true, true);
-            }
-
-            updateScatterplot();
-            updateHistogram();
-            updateRegressionLine();
-            updateLegends();
-        }
-
-    }]);
-
-angular.module('smartRApp')
-    .config(["$stateProvider", function ($stateProvider) {
-        $stateProvider
-            .state('correlation', {
-                parent: 'site',
-                url: '/correlation',
-                views: {
-                    '@': {
-                        templateUrl: 'src/containers/correlation/correlation.html'
-                    },
-                    'content@correlation': {
-                        templateUrl: 'src/containers/correlation/correlation.content.html'
-                    },
-                    'sidebar@correlation': {
-                        templateUrl: 'app/components/sidebar/sidebar.html',
-                        controller: 'SidebarCtrl',
-                        controllerAs: 'vm'
-                    }
-                }
-            });
-    }]);
 
 angular.module('smartRApp').directive('heatmapPlot', [
     'smartRUtils',
@@ -4078,6 +3518,567 @@ angular.module('smartRApp')
                         templateUrl: 'src/containers/heatmap/heatmap.content.html'
                     },
                     'sidebar@heatmap': {
+                        templateUrl: 'app/components/sidebar/sidebar.html',
+                        controller: 'SidebarCtrl',
+                        controllerAs: 'vm'
+                    }
+                }
+            });
+    }]);
+
+
+'use strict';
+
+angular.module('smartRApp').controller('BoxplotController', [
+    '$scope',
+    'smartRUtils',
+    'commonWorkflowService',
+    function($scope, smartRUtils, commonWorkflowService) {
+
+        commonWorkflowService.initializeWorkflow('boxplot', $scope);
+
+        $scope.fetch = {
+            running: false,
+            disabled: false,
+            loaded: false,
+            conceptBoxes: {
+                datapoints: {concepts: [], valid: false}
+            }
+        };
+
+        $scope.runAnalysis = {
+            running: false,
+            disabled: true,
+            scriptResults: {},
+            params: {}
+        };
+
+        $scope.$watchGroup(['fetch.running', 'runAnalysis.running'],
+            function(newValues) {
+                var fetchRunning = newValues[0],
+                    runAnalysisRunning = newValues[1];
+
+                // clear old results
+                if (fetchRunning) {
+                    $scope.runAnalysis.scriptResults = {};
+                }
+
+                // disable tabs when certain criteria are not met
+                $scope.fetch.disabled = runAnalysisRunning;
+                $scope.runAnalysis.disabled = fetchRunning || !$scope.fetch.loaded;
+            }
+        );
+
+    }]);
+
+
+angular.module('smartRApp').directive('boxplot', [
+    'smartRUtils',
+    'rServeService',
+    '$rootScope',
+    function(smartRUtils, rServeService, $rootScope) {
+
+        return {
+            restrict: 'E',
+            scope: {
+                data: '=',
+                width: '@',
+                height: '@'
+            },
+            templateUrl:  'src/containers/templates/boxplot.html',
+            link: function (scope, element) {
+                var template_ctrl = element.children()[0],
+                    template_viz = element.children()[1];
+                /**
+                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
+                 */
+                scope.$watch('data', function () {
+                    $(template_viz).empty();
+                    if (! $.isEmptyObject(scope.data)) {
+                        smartRUtils.prepareWindowSize(scope.width, scope.height);
+                        scope.showControls = true;
+                        createBoxplot(scope, template_viz, template_ctrl);
+                    }
+                });
+            }
+        };
+
+        function createBoxplot(scope, root) {
+            var concept = '',
+                globalMin = Number.MIN_VALUE,
+                globalMax = Number.MAX_VALUE,
+                categories = [],
+                excludedPatientIDs = [],
+                useLog = false;
+            function setData(data) {
+                concept = data.concept[0];
+                globalMin = data.globalMin[0];
+                globalMax = data.globalMax[0];
+                categories = data['Subset 2'] ? ['Subset 1', 'Subset 2'] : ['Subset 1'];
+                excludedPatientIDs = data.excludedPatientIDs;
+                useLog = data.useLog[0];
+            }
+            setData(scope.data);
+
+            var removeBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-remove-btn');
+            removeBtn.addEventListener('click', removeOutliers);
+
+            var resetBtn = smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn');
+            resetBtn.addEventListener('click', reset);
+
+            var kdeCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-kde-check');
+            kdeCheck.addEventListener('change', function() { swapKDE(kdeCheck.checked); });
+            kdeCheck.checked = false;
+
+            var jitterCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-jitter-check');
+            jitterCheck.addEventListener('change', function() { swapJitter(jitterCheck.checked); });
+            jitterCheck.checked = false;
+
+            var logCheck = smartRUtils.getElementWithoutEventListeners('sr-boxplot-log-check');
+            logCheck.checked = useLog;
+            logCheck.addEventListener('change', function() { swapLog(logCheck.checked); });
+
+            var animationDuration = 1000;
+
+            var width = parseInt(scope.width);
+            var height = parseInt(scope.height);
+            var margin = {top: 20, right: 60, bottom: 200, left: 280};
+
+            var boxWidth = 0.12 * width;
+            var whiskerLength = boxWidth / 6;
+
+            var colorScale = d3.scale.quantile()
+                .range(['rgb(158,1,66)', 'rgb(213,62,79)', 'rgb(244,109,67)', 'rgb(253,174,97)', 'rgb(254,224,139)', 'rgb(255,255,191)', 'rgb(230,245,152)', 'rgb(171,221,164)', 'rgb(102,194,165)', 'rgb(50,136,189)', 'rgb(94,79,162)']);
+
+            var boxplot = d3.select(root).append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+            var x = d3.scale.ordinal()
+                .domain(categories)
+                .rangeBands([0, width], 1, 0.5);
+
+            var y = d3.scale.linear()
+                .domain([globalMin, globalMax])
+                .range([height, 0]);
+
+            var yAxis = d3.svg.axis()
+                .scale(y)
+                .orient('left');
+
+            var xAxis = d3.svg.axis()
+                .scale(x)
+                .orient('bottom');
+
+            boxplot.append('g')
+                .attr('class', 'y axis')
+                .attr('transform', 'translate(' + 0 + ',' + 0 + ')')
+                .call(yAxis);
+
+            boxplot.append('g')
+                .attr('class', 'x axis')
+                .attr('transform', 'translate(' + 0 + ',' + (height + 20) + ')')
+                .call(xAxis)
+                .selectAll('text')
+                .attr('dy', '.35em')
+                .attr('transform', 'translate(' + 0 + ',' + 5 + ')rotate(45)')
+                .style('text-anchor', 'start');
+
+            boxplot.append('text')
+                .attr('transform', 'translate(' + (-40) + ',' + (height / 2) + ')rotate(-90)')
+                .attr('text-anchor', 'middle')
+                .text(smartRUtils.shortenConcept(concept) + (useLog ? ' (log2)' : ''));
+
+            var tip = d3.tip()
+                .attr('class', 'd3-tip')
+                .offset([-10, 0])
+                .html(function(d) { return d; });
+
+            boxplot.call(tip);
+
+            var brush = d3.svg.brush()
+                .x(d3.scale.identity().domain([0, width]))
+                .y(d3.scale.identity().domain([-5, height + 5]))
+                .on('brush', function () {
+                    contextMenu.hide();
+                    updateSelection();
+                });
+
+            boxplot.append('g')
+                .attr('class', 'brush')
+                .on('mousedown', function () {
+                    if (d3.event.button === 2) {
+                        d3.event.stopImmediatePropagation();
+                    }
+                })
+                .call(brush);
+
+            var contextMenu = d3.tip()
+                .attr('class', 'd3-tip sr-contextmenu')
+                .html(function(d) { return d; });
+
+            boxplot.call(contextMenu);
+
+            function _addEventListeners() {
+                smartRUtils.getElementWithoutEventListeners('sr-boxplot-exclude-btn').addEventListener('click', function() {
+                    contextMenu.hide();
+                    excludeSelection();
+                });
+
+                smartRUtils.getElementWithoutEventListeners('sr-boxplot-reset-btn-2').addEventListener('click', function() {
+                    contextMenu.hide();
+                    reset();
+                });
+            }
+
+            boxplot.on('contextmenu', function () {
+                d3.event.preventDefault();
+                contextMenu.show('<input id="sr-boxplot-exclude-btn" value="Exclude" class="sr-ctx-menu-btn"><br/>' +
+                    '<input id="sr-boxplot-reset-btn-2" value="Reset" class="sr-ctx-menu-btn">');
+                _addEventListeners();
+            });
+
+        var currentSelection;
+        function updateSelection() {
+            d3.selectAll('.point').classed('brushed', false);
+            var extent = brush.extent();
+            var left = extent[0][0],
+                top = extent[0][1],
+                right = extent[1][0],
+                bottom = extent[1][1];
+            currentSelection = d3.selectAll('.point')
+                .filter(function (d) {
+                    var point = d3.select(this);
+                    return y(d.value) >= top && y(d.value) <= bottom && point.attr('cx') >= left && point.attr('cx') <= right;
+                })
+                .classed('brushed', true)
+                .data()
+                .map(function(d) { return d.patientID; });
+        }
+
+            function excludeSelection() {
+                excludedPatientIDs = excludedPatientIDs.concat(currentSelection);
+                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
+
+                rServeService.startScriptExecution({
+                    taskType: 'run',
+                    arguments: settings
+                }).then(
+                    function (response) {
+                        removePlot();
+                        scope.data = JSON.parse(response.result.artifacts.value);
+                    },
+                    function (response) {
+                        console.error(response);
+                    }
+                );
+            }
+
+            function removePlot() {
+                d3.select(root).selectAll('*').remove();
+                d3.selectAll('.d3-tip').remove();
+            }
+
+        function removeOutliers() {
+            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
+            if (currentSelection) { excludeSelection(); }
+        }
+
+            function kernelDensityEstimator(kernel, x) {
+                return function (sample) {
+                    return x.map(function (x) {
+                        return [x, d3.mean(sample, function (v) {
+                            return kernel(x - v);
+                        })];
+                    });
+                };
+            }
+
+            function epanechnikovKernel(scale) {
+                return function (u) {
+                    return Math.abs(u /= scale) <= 1 ? 0.75 * (1 - u * u) / scale : 0;
+                };
+            }
+
+            // function gaussKernel(scale) {
+            //     return function (u) {
+            //         return Math.exp(-u * u / 2) / Math.sqrt(2 * Math.PI) / scale;
+            //     };
+            // }
+
+            function swapKDE(checked) {
+                if (!checked) {
+                    d3.selectAll('.line').attr('visibility', 'hidden');
+                } else {
+                    d3.selectAll('.line').attr('visibility', 'visible');
+                }
+            }
+
+            function shortenNodeLabel(label) {
+                label = label.replace(/\W+/g, '');
+                return label;
+            }
+
+            var jitterWidth = 1.0;
+
+            function swapJitter() {
+                categories.forEach(function(category) {
+                    d3.selectAll('.point.' + smartRUtils.makeSafeForCSS(shortenNodeLabel(category)))
+                        .transition()
+                        .duration(animationDuration)
+                        .attr('cx', function(d) {
+                            return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
+                        });
+                });
+            }
+
+            function swapLog() {
+                var settings = { excludedPatientIDs: excludedPatientIDs, useLog: logCheck.checked };
+                rServeService.startScriptExecution({
+                    taskType: 'run',
+                    arguments: settings
+                }).then(
+                    function (response) {
+                        removePlot();
+                        scope.data = JSON.parse(response.result.artifacts.value);
+                    },
+                    function (response) {
+                        console.error(response);
+                    }
+                );
+            }
+
+            var boxes = {};
+            categories.forEach(function(category) {
+                boxes[category] = boxplot.append('g');
+                var params = scope.data[category];
+                createBox(params, category, boxes[category]);
+            });
+
+            function createBox(params, category, box) {
+                var boxLabel = shortenNodeLabel(category);
+                colorScale.domain(d3.extent(y.domain()));
+
+                var whisker = box.selectAll('.whisker')
+                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
+                        return boxLabel + '-whisker-' + i;
+                    });
+
+                whisker.enter()
+                    .append('line')
+                    .attr('class', 'whisker');
+
+                whisker.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x(category) - whiskerLength / 2)
+                    .attr('y1', function (d) { return y(d); })
+                    .attr('x2', x(category) + whiskerLength / 2)
+                    .attr('y2', function (d) { return y(d); });
+
+                var whiskerLabel = box.selectAll('.whiskerLabel')
+                    .data([params.upperWhisker, params.lowerWhisker], function (d, i) {
+                        return boxLabel + '-whiskerLabel-' + i;
+                    });
+
+                whiskerLabel.enter()
+                    .append('text')
+                    .attr('class', 'whiskerLabel boxplotValue');
+
+                whiskerLabel.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) + whiskerLength / 2)
+                    .attr('y', function (d) { return y(d); })
+                    .attr('dx', '.35em')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'start')
+                    .text(function (d) { return d; });
+
+                var hingeLength = boxWidth;
+                var hinge = box.selectAll('.hinge')
+                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
+                        return boxLabel + '-hinge-' + i;
+                    });
+
+                hinge.enter()
+                    .append('line')
+                    .attr('class', 'hinge');
+
+                hinge.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x(category) - hingeLength / 2)
+                    .attr('y1', function (d) { return y(d); })
+                    .attr('x2', x(category) + hingeLength / 2)
+                    .attr('y2', function (d) { return y(d); });
+
+                var hingeLabel = box.selectAll('.hingeLabel')
+                    .data([params.upperHinge, params.lowerHinge], function (d, i) {
+                        return boxLabel + '-hingeLabel-' + i;
+                    });
+
+                hingeLabel.enter()
+                    .append('text')
+                    .attr('class', 'hingeLabel boxplotValue');
+
+                hingeLabel.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) - hingeLength / 2)
+                    .attr('y', function (d) { return y(d); })
+                    .attr('dx', '-.35em')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'end')
+                    .text(function (d) { return d; });
+
+                var connection = box.selectAll('.connection')
+                    .data([[params.upperWhisker, params.upperHinge], [params.lowerWhisker, params.lowerHinge]],
+                        function (d, i) { return boxLabel + '-connection-' + i; });
+
+                connection.enter()
+                    .append('line')
+                    .attr('class', 'connection');
+
+                connection.transition()
+                    .duration(animationDuration)
+                    .attr('x1', x(category))
+                    .attr('y1', function (d) { return y(d[0]); })
+                    .attr('x2', x(category))
+                    .attr('y2', function (d) { return y(d[1]); });
+
+                var upperBox = box.selectAll('.box.upper')
+                    .data(params.upperHinge, function (d) { return d; });
+
+                upperBox.enter()
+                    .append('rect')
+                    .attr('class', 'box upper');
+
+                upperBox.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) - hingeLength / 2)
+                    .attr('y', y(params.upperHinge))
+                    .attr('height', Math.abs(y(params.upperHinge) - y(params.median)))
+                    .attr('width', hingeLength);
+
+                var lowerBox = box.selectAll('.box.lower')
+                    .data(params.lowerHinge, function (d) { return d; });
+
+                lowerBox.enter()
+                    .append('rect')
+                    .attr('class', 'box lower');
+
+                lowerBox.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) - hingeLength / 2)
+                    .attr('y', y(params.median))
+                    .attr('height', Math.abs(y(params.median) - y(params.lowerHinge)))
+                    .attr('width', hingeLength);
+
+                var medianLabel = box.selectAll('.medianLabel')
+                    .data(params.median, function (d) { return d;});
+
+                medianLabel.enter()
+                    .append('text')
+                    .attr('class', 'medianLabel boxplotValue');
+
+                medianLabel.transition()
+                    .duration(animationDuration)
+                    .attr('x', x(category) + hingeLength / 2)
+                    .attr('y', function () { return y(params.median); })
+                    .attr('dx', '.35em')
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', 'start')
+                    .text(params.median);
+
+                var point = box.selectAll('.point')
+                    .data(params.rawData, function (d) { return boxLabel + '-' + d.patientID; });
+
+                point.enter()
+                    .append('circle')
+                    .attr('cx', function (d) {
+                        return jitterCheck.checked ? x(category) + boxWidth * jitterWidth * d.jitter : x(category);
+                    })
+                    .attr('r', 0)
+                    .attr('fill', function (d) { return colorScale(d.value); })
+                    .on('mouseover', function (d) {
+                        tip.show('Value: ' + d.value + '</br>' +
+                            'PatientID: ' + d.patientID + '</br>' +
+                            'Outlier: ' + d.outlier);
+                    })
+                    .on('mouseout', function () {
+                        tip.hide();
+                    });
+
+                point
+                    .attr('class', function (d) {
+                        return 'point patientID-' + smartRUtils.makeSafeForCSS(d.patientID) +
+                            (d.outlier ? ' outlier ' : ' ') + smartRUtils.makeSafeForCSS(boxLabel);
+                    }) // This is here and not in the .enter() because points might become outlier on removal of other points
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('cy', function (d) { return y(d.value); })
+                    .attr('r', 3);
+
+                point.exit()
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('r', 0)
+                    .remove();
+
+                var yCopy = y.copy();
+                yCopy.domain([params.lowerWhisker, params.upperWhisker]);
+                var kde = kernelDensityEstimator(epanechnikovKernel(6), yCopy.ticks(100));
+                var values = params.rawData.map(function (d) { return d.value; });
+                var estFun = kde(values);
+                var kdeDomain = d3.extent(estFun, function (d) { return d[1]; });
+                var kdeScale = d3.scale.linear()
+                    .domain(kdeDomain)
+                    .range([0, boxWidth / 2]);
+                var lineGen = d3.svg.line()
+                    .x(function (d) { return x(category) - kdeScale(d[1]); })
+                    .y(function (d) { return y(d[0]); });
+
+                box.append('path')
+                    .attr('class', 'line')
+                    .attr('visibility', 'hidden')
+                    .datum(estFun)
+                    .transition()
+                    .duration(animationDuration)
+                    .attr('d', lineGen);
+            }
+
+            function removeBrush() {
+                d3.selectAll('.brush')
+                    .call(brush.clear());
+            }
+
+            function reset() {
+                removeBrush();
+                excludedPatientIDs = [];
+                currentSelection = [];
+                excludeSelection(); // Abusing the method because I can
+            }
+
+        }
+
+    }]);
+
+
+angular.module('smartRApp')
+    .config(["$stateProvider", function ($stateProvider) {
+        $stateProvider
+            .state('boxplot', {
+                parent: 'site',
+                url: '/boxplot',
+                views: {
+                    '@': {
+                        templateUrl: 'src/containers/boxplot/boxplot.html'
+                    },
+                    'content@boxplot': {
+                        templateUrl: 'src/containers/boxplot/boxplot.content.html',
+                        controller: 'BoxplotController',
+                        controllerAs: 'vm'
+                    },
+                    'sidebar@boxplot': {
                         templateUrl: 'app/components/sidebar/sidebar.html',
                         controller: 'SidebarCtrl',
                         controllerAs: 'vm'
