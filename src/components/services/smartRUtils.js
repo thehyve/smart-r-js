@@ -84,9 +84,37 @@ angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService'
         $('#heim-tabs').css('min-height', parseInt(height) + 25);
     };
 
-    /**
-    * removes all kind of elements that might live out of the viz directive (e.g. tooltips, contextmenu, ...)
-    */
+    service.getScrollBarWidth = function() {
+        var inner = document.createElement('p');
+        inner.style.width = "100%";
+        inner.style.height = "200px";
+
+        var outer = document.createElement('div');
+        outer.style.position = "absolute";
+        outer.style.top = "0px";
+        outer.style.left = "0px";
+        outer.style.visibility = "hidden";
+        outer.style.width = "200px";
+        outer.style.height = "150px";
+        outer.style.overflow = "hidden";
+        outer.appendChild (inner);
+
+        document.body.appendChild (outer);
+        var w1 = inner.offsetWidth;
+        outer.style.overflow = 'scroll';
+        var w2 = inner.offsetWidth;
+        if (w1 === w2) {
+            w2 = outer.clientWidth;
+        }
+
+        document.body.removeChild (outer);
+
+        return (w1 - w2);
+    };
+
+    /** 
+     * removes all kind of elements that might live out of the viz directive (e.g. tooltips, contextmenu, ...)
+     */
     service.cleanUp = function() {
         $('.d3-tip').remove();
     };
@@ -97,7 +125,29 @@ angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService'
 
     service.getSubsetIds = function smartRUtil_getSubsetIds() {
         var defer = $q.defer();
-        defer.resolve(CohortSharingService.getSelection());
+
+        function resolveResult() {
+            var res = window.GLOBAL.CurrentSubsetIDs.slice(1).map(function (v) {
+                return v || null;
+            });
+            if (res.some(function (el) {
+                return el !== null;
+            })) {
+                defer.resolve(res);
+            } else {
+                defer.reject();
+            }
+        }
+
+        for (var i = 1; i <= window.GLOBAL.NumOfSubsets; i++) {
+            if (!window.isSubsetEmpty(i) && !window.GLOBAL.CurrentSubsetIDs[i]) {
+                window.runAllQueries(resolveResult, window.smartRPanel);
+                return defer.promise;
+            }
+        }
+
+        resolveResult();
+
         return defer.promise;
     };
 
