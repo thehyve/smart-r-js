@@ -17,4 +17,4 @@ const hub = new HubRegistry([conf.path.tasks('*.js')]);
 gulp.registry(hub);
 
 gulp.task('test', gulp.series('scripts', 'karma:single-run'));
-gulp.task('build', gulp.series('clean', 'partials', 'copy-to-tmp', 'styles', 'build'));
+gulp.task('build', gulp.series('clean', 'partials', 'copy-to-tmp', 'styles', 'copy-images', 'build'));
