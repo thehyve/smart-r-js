@@ -19,3 +19,12 @@ function copyToTmp() {
       ])
       .pipe(gulp.dest(conf.path.tmp()));
 }
+
+gulp.task('copy-images', copyImages);
+
+function copyImages() {
+    return gulp.src([
+            conf.path.src('**/*.png')
+        ])
+        .pipe(gulp.dest(conf.path.dist()));
+}
