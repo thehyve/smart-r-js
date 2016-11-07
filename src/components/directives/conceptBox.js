@@ -42,15 +42,16 @@ angular.module('smartRApp').directive('conceptBox', [
                 };
 
                 var typeMap = {
-                    hleaficon: 'HD',
-                    null: 'CATEGORICAL_OPTION', // FIXME: alphaicon does not exist yet in transmartApp master branch
-                    valueicon: 'NUMERIC'
+                    HIGH_DIMENSIONAL: 'HD',
+                    CATEGORICAL_OPTION: 'LD-categorical',
+                    NUMERIC: 'LD-numerical'
                 };
+
                 var _containsOnlyCorrectType = function () {
                     if (scope.type === undefined) return true;
                     var correct = true;
                     scope.conceptGroup.concepts.forEach(function (conceptObj) {
-                        if (scope.type != conceptObj.type) {
+                        if (scope.type !== typeMap[conceptObj.type]) {
                             correct = false;
                             return ;
                         }
