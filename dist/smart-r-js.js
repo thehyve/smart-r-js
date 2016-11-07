@@ -275,589 +275,6 @@ angular.module('smartRApp').controller('VolcanoplotController', [
     }]);
 
 
-//# sourceURL=commonWorkflowService.js
-
-'use strict';
-
-angular.module('smartRApp').factory('commonWorkflowService', ['rServeService', function(rServeService) {
-    var service = {};
-
-    service.initializeWorkflow = function(workflowName, scope) {
-        service.currentScope = scope;
-
-        rServeService.destroyAndStartSession(workflowName);
-    };
-
-    return service;
-
-}]);
-
-//# sourceURL=rServeService.js
-
-'use strict';
-
-angular.module('smartRApp').factory('rServeService', [
-    'smartRUtils',
-    '$q',
-    '$http',
-    'EndpointService',
-    function (smartRUtils, $q, $http, EndpointService) {
-        var baseURL = EndpointService.getMasterEndpoint().url;
-
-        var service = {};
-
-        var NOOP_ABORT = function () {
-        };
-        var TIMEOUT = 10000; // 10 s
-        var CHECK_DELAY = 500; // 0.5 s
-        var SESSION_TOUCH_DELAY = 60000; // 1 min
-
-        /* we only support one session at a time */
-
-        var state = {
-            currentRequestAbort: NOOP_ABORT,
-            sessionId: null,
-            touchTimeout: null // for current session id
-        };
-//headers: {'Authorization': 'xxxyyyzzz'}
-        var workflow = '';
-        /* returns a promise with the session id and
-         * saves the session id for future calls */
-        var authorizationHeader = '';
-        service.startSession = function (name) {
-            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
-            authorizationHeader = authHeaders['Authorization'];
-            baseURL = EndpointService.getMasterEndpoint().url;
-            workflow = name;
-            var request = $http({
-                url: baseURL + '/RSession/create',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                    Accept: "application/hal+json"
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    workflow: workflow
-                }
-            });
-
-            return $q(function (resolve, reject) {
-                request.then(
-                    function (response) {
-                        state.sessionId = response.data.sessionId;
-                        rServeService_scheduleTouch();
-                        resolve();
-                    },
-                    function (response) {
-                        reject(response.statusText);
-                    }
-                );
-            });
-        };
-
-        service.fetchImageResource = function (uri) {
-            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
-            authorizationHeader = authHeaders['Authorization'];
-
-            var deferred = $q.defer();
-
-            var header = {};
-            header.Authorization = authorizationHeader;
-
-            $http({
-                method: 'GET',
-                headers: header,
-                url: uri,
-                responseType: 'arraybuffer',
-                eventHandlers: {
-                    progress: function (e) {
-                        deferred.notify(e);
-                    }
-                }
-            }).then(function (res) {
-                var arr = new Uint8Array(res.data);
-
-                // Convert the int array to a binary string
-                // We have to use apply() as we are converting an *array*
-                // and String.fromCharCode() takes one or more single values, not
-                // an array.
-                var raw = String.fromCharCode.apply(null, arr);
-                var b64 = btoa(raw);
-                var dataURL = "data:image/jpeg;base64," + b64;
-
-                return deferred.resolve(dataURL);
-            }).catch(function (err) {
-                return deferred.reject({
-                    status: this.status,
-                    statusText: xmlHTTP.statusText
-                })
-            });
-
-            return deferred.promise;
-        };
-
-        service.touch = function (sessionId) {
-            if (sessionId !== state.sessionId) {
-                return;
-            }
-
-            var touchRequest = $http({
-                url: baseURL + '/RSession/touch',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    sessionId: sessionId
-                }
-            });
-
-            touchRequest.finally(function () {
-                rServeService_scheduleTouch(); // schedule another
-            });
-        };
-
-        function rServeService_scheduleTouch() {
-            window.clearTimeout(state.touchTimeout);
-            state.touchTimeout = window.setTimeout(function () {
-                service.touch(state.sessionId);
-            }, SESSION_TOUCH_DELAY);
-        }
-
-        service.deleteSessionFiles = function (sessionId) {
-            sessionId = sessionId || state.sessionId;
-
-            return $http({
-                url: baseURL + '/RSession/deleteFiles',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    sessionId: sessionId
-                }
-            });
-        };
-
-        service.destroySession = function (sessionId) {
-            sessionId = sessionId || state.sessionId;
-
-            if (!sessionId) {
-                return;
-            }
-
-            var request = $http({
-                url: baseURL + '/RSession/delete',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                config: {
-                    timeout: TIMEOUT
-                },
-                data: {
-                    sessionId: sessionId
-                }
-            });
-
-            return request.finally(function () {
-                if (state.sessionId === sessionId) {
-                    service.abandonCurrentSession();
-                }
-            });
-        };
-
-        service.abandonCurrentSession = function () {
-            window.clearTimeout(state.touchTimeout);
-            state.sessionId = null;
-        };
-
-        service.destroyAndStartSession = function (workflowName) {
-            $q.when(service.destroySession()).then(function () {
-                service.startSession(workflowName);
-            });
-        };
-
-        /*
-         * taskData = {
-         *     arguments: { ... },
-         *     taskType: 'fetchData' or name of R script minus .R,
-         *     phase: 'fetch' | 'preprocess' | 'run',
-         * }
-         */
-        service.startScriptExecution = function (taskDataOrig) {
-
-            var taskData = $.extend({}, taskDataOrig); // clone the thing
-            state.currentRequestAbort();
-
-            var canceler = $q.defer();
-            var _httpArg = {
-                url: baseURL + '/ScriptExecution/run',
-                method: 'POST',
-                timeout: canceler.promise,
-                responseType: 'json',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: authorizationHeader,
-                },
-                data: {
-                    sessionId: state.sessionId,
-                    arguments: taskData.arguments,
-                    taskType: taskData.taskType,
-                    workflow: workflow
-                }
-            };
-            console.log(_httpArg);
-            var runRequest = $http(_httpArg);
-
-            runRequest.finally(function () {
-                state.currentRequestAbort = NOOP_ABORT;
-            });
-
-            state.currentRequestAbort = function () {
-                canceler.resolve();
-            };
-
-            /* schedule checks */
-            var promise = $q(function (resolve, reject) {
-                runRequest.then(
-                    function (response) {
-                        if (!response.data) {
-                            console.error('Unexpected response:', response);
-                        }
-                        taskData.executionId = response.data.executionId;
-                        _checkStatus(taskData.executionId, resolve, reject);
-                    },
-                    function (response) {
-                        reject(response.statusText);
-                    }
-                );
-            });
-
-            promise.cancel = function () {
-                // calling this method should by itself resolve the promise
-                state.currentRequestAbort();
-            };
-
-            // no touching necessary when a task is running
-            window.clearTimeout(state.touchTimeout);
-            promise.finally(rServeService_scheduleTouch.bind(this));
-
-            return promise;
-        };
-
-        /* aux function of _startScriptExecution. Needs to follow its contract
-         * with respect to the fail and success result of the promise */
-        function _checkStatus(executionId, resolve, reject) {
-            var canceler = $q.defer();
-            var statusRequest = $http({
-                method: 'GET',
-                timeout: canceler.promise,
-                headers: {
-                    Authorization: authorizationHeader,
-                },
-                url: baseURL + '/ScriptExecution/status' +
-                '?sessionId=' + state.sessionId +
-                '&executionId=' + executionId
-            });
-
-            statusRequest.finally(function () {
-                state.currentRequestAbort = NOOP_ABORT;
-            });
-            state.currentRequestAbort = function () {
-                canceler.resolve();
-            };
-
-            statusRequest.then(
-                function (d) {
-                    if (d.data.state === 'FINISHED') {
-                        d.data.executionId = executionId;
-                        resolve(d.data);
-                    } else if (d.data.state === 'FAILED') {
-                        reject(d.data.result.exception);
-                    } else {
-                        // else still pending
-                        window.setTimeout(function () {
-                            _checkStatus(executionId, resolve, reject);
-                        }, CHECK_DELAY);
-                    }
-                },
-                function (response) {
-                    reject(response.statusText);
-                }
-            );
-        }
-
-        service.downloadJsonFile = function (executionId, filename) {
-            return $http({
-                method: 'GET',
-                url: this.urlForFile(executionId, filename),
-                headers: {
-                    Authorization: authorizationHeader,
-                },
-            });
-        };
-
-
-        service.urlForFile = function (executionId, filename) {
-            return baseURL +
-                '/ScriptExecution/downloadFile?sessionId=' + state.sessionId +
-                '&executionId=' + executionId + '&filename=' + filename;
-        };
-
-        service.loadDataIntoSession = function (conceptKeys, dataConstraints, projection) {
-            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
-            return $q(function (resolve, reject) {
-                smartRUtils.getSubsetIds().then(
-                    function (subsets) {
-                        var _arg = {
-                            conceptKeys: conceptKeys,
-                            resultInstanceIds: subsets,
-                            projection: projection
-                        };
-
-                        if (typeof dataConstraints !== 'undefined') {
-                            _arg.dataConstraints = dataConstraints;
-                        }
-                        console.log(_arg);
-                        service.startScriptExecution({
-                            taskType: 'fetchData',
-                            arguments: _arg
-                        }).then(
-                            resolve,
-                            function (response) {
-                                reject(response);
-                            }
-                        );
-                    },
-                    function () {
-                        reject('Could not create subsets!');
-                    }
-                );
-            });
-        };
-
-        service.executeSummaryStats = function (phase, projection) {
-            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
-            return $q(function (resolve, reject) {
-                service.startScriptExecution({
-                    taskType: 'summary',
-                    arguments: {
-                        phase: phase,
-                        projection: projection // always required, even for low-dim data
-                    }
-                }).then(
-                    function (response) {
-                        if (response.result.artifacts.files.length > 0) {
-                            service.composeSummaryResults(response.result.artifacts.files, response.executionId, phase)
-                                .then(
-                                    function (result) {
-                                        resolve({result: result});
-                                    },
-                                    function (msg) {
-                                        reject(msg.statusText);
-                                    }
-                                );
-                        } else {
-                            resolve({result: {}});
-                        }
-                    },
-                    function (response) {
-                        reject(response);
-                    }
-                );
-            });
-        };
-
-        service.composeSummaryResults = function (files, executionId, phase) {
-            // FIXME: errors from downloadJsonFile do not lead to a reject
-            return $q(function (resolve, reject) {
-                var retObj = {summary: [], allSamples: 0, numberOfRows: 0},
-                    fileExt = {fetch: ['.png', 'json'], preprocess: ['all.png', 'all.json']},
-
-                // find matched items in an array by key
-                    _find = function composeSummaryResults_find(key, array) {
-                        // The variable results needs var in this case (without 'var' a global variable is created)
-                        var results = [];
-                        for (var i = 0; i < array.length; i++) {
-                            if (array[i].search(key) > -1) {
-                                results.push(array[i]);
-                            }
-                        }
-                        return results;
-                    },
-
-                // process each item
-                    _processItem = function composeSummaryResults_processItem(img, json) {
-                        return $q(function (resolve) {
-                            service.downloadJsonFile(executionId, json).then(
-                                function (d) {
-                                    retObj.subsets = d.data.length;
-                                    d.data.forEach(function (subset) {
-                                        retObj.allSamples += subset.numberOfSamples;
-                                        retObj.numberOfRows = subset.totalNumberOfValuesIncludingMissing /
-                                            subset.numberOfSamples;
-                                    });
-                                    resolve({img: service.urlForFile(executionId, img), json: d});
-                                },
-                                function (err) {
-                                    reject(err);
-                                }
-                            );
-                        });
-                    };
-
-                // first identify image and json files
-                var _images = _find(fileExt[phase][0], files),
-                    _jsons = _find(fileExt[phase][1], files);
-
-                // load each json file contents
-                for (var i = 0; i < _images.length; i++) {
-                    retObj.summary.push(_processItem(_images[i], _jsons[i]));
-                }
-
-                $.when.apply($, retObj.summary).then(function () {
-                    resolve(retObj); // when all contents has been loaded
-                });
-            });
-        };
-
-        service.preprocess = function (args) {
-            return $q(function (resolve, reject) {
-                service.startScriptExecution({
-                    taskType: 'preprocess',
-                    arguments: args
-                }).then(
-                    resolve,
-                    function (response) {
-                        reject(response);
-                    }
-                );
-            });
-        };
-
-        return service;
-    }]);
-
-//# sourceURL=smartRUtils.js
-
-'use strict';
-
-angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService', function($q,
-                                                                                           CohortSharingService) {
-
-    var service = {};
-
-    var nodeToKey = function (node) {
-        return node.restObj.key;
-    };
-
-    service.conceptBoxMapToConceptKeys = function smartRUtils_conceptBoxMapToConceptKeys(conceptBoxMap) {
-        var allConcepts = {};
-        Object.keys(conceptBoxMap).forEach(function(group) {
-            var concepts = conceptBoxMap[group].concepts;
-            concepts.forEach(function(concept, idx) {
-                allConcepts[group + '_' + 'n' + idx] = nodeToKey(concept);
-            });
-        });
-        return allConcepts;
-    };
-
-    /**
-     * Creates a CSS safe version of a given string
-     * This should be used consistently across the whole of SmartR to avoid data induced CSS errors
-     *
-     * @param str
-     * @returns {string}
-     */
-    service.makeSafeForCSS = function smartRUtils_makeSafeForCSS(str) {
-        return String(str).replace(/[^a-z0-9]/g, function(s) {
-            var c = s.charCodeAt(0);
-            if (c === 32) {
-                return '-';
-            }
-            if (c >= 65 && c <= 90) {
-                return '_' + s.toLowerCase();
-            }
-            return '__' + ('000' + c.toString(16)).slice(-4);
-        });
-    };
-
-    service.getElementWithoutEventListeners = function(cssSelector) {
-        var element = document.getElementById(cssSelector);
-        var copy = element.cloneNode(true);
-        element.parentNode.replaceChild(copy, element);
-        return copy;
-    };
-
-    service.shortenConcept = function smartRUtils_shortenConcept(concept) {
-        var split = concept.split('\\');
-        split = split.filter(function(str) { return str !== ''; });
-        return split[split.length - 2] + '/' + split[split.length - 1];
-    };
-
-    // Calculate width of text from DOM element or string. By Phil Freo <http://philfreo.com>
-    $.fn.textWidth = function(text, font) {
-        if (!$.fn.textWidth.fakeEl) {
-            $.fn.textWidth.fakeEl = $('<span>').hide().appendTo(document.body);
-        }
-        $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
-        return $.fn.textWidth.fakeEl.width();
-    };
-
-    service.getTextWidth = function(text, font) {
-        return $.fn.textWidth(text, font);
-    };
-
-    /**
-     * Executes callback with scroll position when SmartR mainframe is scrolled
-     * @param function
-     */
-    service.callOnScroll = function(callback) {
-        $('#sr-index').parent().scroll(function() {
-            var scrollPos = $(this).scrollTop();
-            callback(scrollPos);
-        });
-    };
-
-    service.prepareWindowSize = function(width, height) {
-        $('#heim-tabs').css('min-width', parseInt(width) + 25);
-        $('#heim-tabs').css('min-height', parseInt(height) + 25);
-    };
-
-    /**
-    * removes all kind of elements that might live out of the viz directive (e.g. tooltips, contextmenu, ...)
-    */
-    service.cleanUp = function() {
-        $('.d3-tip').remove();
-    };
-
-    service.countCohorts = function() {
-        return CohortSharingService.getSelection().length;
-    };
-
-    service.getSubsetIds = function smartRUtil_getSubsetIds() {
-        var defer = $q.defer();
-        defer.resolve(CohortSharingService.getSelection());
-        return defer.promise;
-    };
-
-    return service;
-}]);
-
 //# sourceURL=biomarkerSelection.js
 
 'use strict';
@@ -1771,6 +1188,589 @@ angular.module('smartRApp').directive('workflowWarnings', [
         };
     }
 ]);
+
+//# sourceURL=commonWorkflowService.js
+
+'use strict';
+
+angular.module('smartRApp').factory('commonWorkflowService', ['rServeService', function(rServeService) {
+    var service = {};
+
+    service.initializeWorkflow = function(workflowName, scope) {
+        service.currentScope = scope;
+
+        rServeService.destroyAndStartSession(workflowName);
+    };
+
+    return service;
+
+}]);
+
+//# sourceURL=rServeService.js
+
+'use strict';
+
+angular.module('smartRApp').factory('rServeService', [
+    'smartRUtils',
+    '$q',
+    '$http',
+    'EndpointService',
+    function (smartRUtils, $q, $http, EndpointService) {
+        var baseURL = EndpointService.getMasterEndpoint().url;
+
+        var service = {};
+
+        var NOOP_ABORT = function () {
+        };
+        var TIMEOUT = 10000; // 10 s
+        var CHECK_DELAY = 500; // 0.5 s
+        var SESSION_TOUCH_DELAY = 60000; // 1 min
+
+        /* we only support one session at a time */
+
+        var state = {
+            currentRequestAbort: NOOP_ABORT,
+            sessionId: null,
+            touchTimeout: null // for current session id
+        };
+//headers: {'Authorization': 'xxxyyyzzz'}
+        var workflow = '';
+        /* returns a promise with the session id and
+         * saves the session id for future calls */
+        var authorizationHeader = '';
+        service.startSession = function (name) {
+            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
+            authorizationHeader = authHeaders['Authorization'];
+            baseURL = EndpointService.getMasterEndpoint().url;
+            workflow = name;
+            var request = $http({
+                url: baseURL + '/RSession/create',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                    Accept: "application/hal+json"
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    workflow: workflow
+                }
+            });
+
+            return $q(function (resolve, reject) {
+                request.then(
+                    function (response) {
+                        state.sessionId = response.data.sessionId;
+                        rServeService_scheduleTouch();
+                        resolve();
+                    },
+                    function (response) {
+                        reject(response.statusText);
+                    }
+                );
+            });
+        };
+
+        service.fetchImageResource = function (uri) {
+            var authHeaders = EndpointService.getMasterEndpoint().restangular.defaultHeaders;
+            authorizationHeader = authHeaders['Authorization'];
+
+            var deferred = $q.defer();
+
+            var header = {};
+            header.Authorization = authorizationHeader;
+
+            $http({
+                method: 'GET',
+                headers: header,
+                url: uri,
+                responseType: 'arraybuffer',
+                eventHandlers: {
+                    progress: function (e) {
+                        deferred.notify(e);
+                    }
+                }
+            }).then(function (res) {
+                var arr = new Uint8Array(res.data);
+
+                // Convert the int array to a binary string
+                // We have to use apply() as we are converting an *array*
+                // and String.fromCharCode() takes one or more single values, not
+                // an array.
+                var raw = String.fromCharCode.apply(null, arr);
+                var b64 = btoa(raw);
+                var dataURL = "data:image/jpeg;base64," + b64;
+
+                return deferred.resolve(dataURL);
+            }).catch(function (err) {
+                return deferred.reject({
+                    status: this.status,
+                    statusText: xmlHTTP.statusText
+                })
+            });
+
+            return deferred.promise;
+        };
+
+        service.touch = function (sessionId) {
+            if (sessionId !== state.sessionId) {
+                return;
+            }
+
+            var touchRequest = $http({
+                url: baseURL + '/RSession/touch',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    sessionId: sessionId
+                }
+            });
+
+            touchRequest.finally(function () {
+                rServeService_scheduleTouch(); // schedule another
+            });
+        };
+
+        function rServeService_scheduleTouch() {
+            window.clearTimeout(state.touchTimeout);
+            state.touchTimeout = window.setTimeout(function () {
+                service.touch(state.sessionId);
+            }, SESSION_TOUCH_DELAY);
+        }
+
+        service.deleteSessionFiles = function (sessionId) {
+            sessionId = sessionId || state.sessionId;
+
+            return $http({
+                url: baseURL + '/RSession/deleteFiles',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    sessionId: sessionId
+                }
+            });
+        };
+
+        service.destroySession = function (sessionId) {
+            sessionId = sessionId || state.sessionId;
+
+            if (!sessionId) {
+                return;
+            }
+
+            var request = $http({
+                url: baseURL + '/RSession/delete',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                config: {
+                    timeout: TIMEOUT
+                },
+                data: {
+                    sessionId: sessionId
+                }
+            });
+
+            return request.finally(function () {
+                if (state.sessionId === sessionId) {
+                    service.abandonCurrentSession();
+                }
+            });
+        };
+
+        service.abandonCurrentSession = function () {
+            window.clearTimeout(state.touchTimeout);
+            state.sessionId = null;
+        };
+
+        service.destroyAndStartSession = function (workflowName) {
+            $q.when(service.destroySession()).then(function () {
+                service.startSession(workflowName);
+            });
+        };
+
+        /*
+         * taskData = {
+         *     arguments: { ... },
+         *     taskType: 'fetchData' or name of R script minus .R,
+         *     phase: 'fetch' | 'preprocess' | 'run',
+         * }
+         */
+        service.startScriptExecution = function (taskDataOrig) {
+
+            var taskData = $.extend({}, taskDataOrig); // clone the thing
+            state.currentRequestAbort();
+
+            var canceler = $q.defer();
+            var _httpArg = {
+                url: baseURL + '/ScriptExecution/run',
+                method: 'POST',
+                timeout: canceler.promise,
+                responseType: 'json',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authorizationHeader,
+                },
+                data: {
+                    sessionId: state.sessionId,
+                    arguments: taskData.arguments,
+                    taskType: taskData.taskType,
+                    workflow: workflow
+                }
+            };
+            console.log(_httpArg);
+            var runRequest = $http(_httpArg);
+
+            runRequest.finally(function () {
+                state.currentRequestAbort = NOOP_ABORT;
+            });
+
+            state.currentRequestAbort = function () {
+                canceler.resolve();
+            };
+
+            /* schedule checks */
+            var promise = $q(function (resolve, reject) {
+                runRequest.then(
+                    function (response) {
+                        if (!response.data) {
+                            console.error('Unexpected response:', response);
+                        }
+                        taskData.executionId = response.data.executionId;
+                        _checkStatus(taskData.executionId, resolve, reject);
+                    },
+                    function (response) {
+                        reject(response.statusText);
+                    }
+                );
+            });
+
+            promise.cancel = function () {
+                // calling this method should by itself resolve the promise
+                state.currentRequestAbort();
+            };
+
+            // no touching necessary when a task is running
+            window.clearTimeout(state.touchTimeout);
+            promise.finally(rServeService_scheduleTouch.bind(this));
+
+            return promise;
+        };
+
+        /* aux function of _startScriptExecution. Needs to follow its contract
+         * with respect to the fail and success result of the promise */
+        function _checkStatus(executionId, resolve, reject) {
+            var canceler = $q.defer();
+            var statusRequest = $http({
+                method: 'GET',
+                timeout: canceler.promise,
+                headers: {
+                    Authorization: authorizationHeader,
+                },
+                url: baseURL + '/ScriptExecution/status' +
+                '?sessionId=' + state.sessionId +
+                '&executionId=' + executionId
+            });
+
+            statusRequest.finally(function () {
+                state.currentRequestAbort = NOOP_ABORT;
+            });
+            state.currentRequestAbort = function () {
+                canceler.resolve();
+            };
+
+            statusRequest.then(
+                function (d) {
+                    if (d.data.state === 'FINISHED') {
+                        d.data.executionId = executionId;
+                        resolve(d.data);
+                    } else if (d.data.state === 'FAILED') {
+                        reject(d.data.result.exception);
+                    } else {
+                        // else still pending
+                        window.setTimeout(function () {
+                            _checkStatus(executionId, resolve, reject);
+                        }, CHECK_DELAY);
+                    }
+                },
+                function (response) {
+                    reject(response.statusText);
+                }
+            );
+        }
+
+        service.downloadJsonFile = function (executionId, filename) {
+            return $http({
+                method: 'GET',
+                url: this.urlForFile(executionId, filename),
+                headers: {
+                    Authorization: authorizationHeader,
+                },
+            });
+        };
+
+
+        service.urlForFile = function (executionId, filename) {
+            return baseURL +
+                '/ScriptExecution/downloadFile?sessionId=' + state.sessionId +
+                '&executionId=' + executionId + '&filename=' + filename;
+        };
+
+        service.loadDataIntoSession = function (conceptKeys, dataConstraints, projection) {
+            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
+            return $q(function (resolve, reject) {
+                smartRUtils.getSubsetIds().then(
+                    function (subsets) {
+                        var _arg = {
+                            conceptKeys: conceptKeys,
+                            resultInstanceIds: subsets,
+                            projection: projection
+                        };
+
+                        if (typeof dataConstraints !== 'undefined') {
+                            _arg.dataConstraints = dataConstraints;
+                        }
+                        console.log(_arg);
+                        service.startScriptExecution({
+                            taskType: 'fetchData',
+                            arguments: _arg
+                        }).then(
+                            resolve,
+                            function (response) {
+                                reject(response);
+                            }
+                        );
+                    },
+                    function () {
+                        reject('Could not create subsets!');
+                    }
+                );
+            });
+        };
+
+        service.executeSummaryStats = function (phase, projection) {
+            projection = typeof projection === 'undefined' ? 'log_intensity' : projection; // default to log_intensity
+            return $q(function (resolve, reject) {
+                service.startScriptExecution({
+                    taskType: 'summary',
+                    arguments: {
+                        phase: phase,
+                        projection: projection // always required, even for low-dim data
+                    }
+                }).then(
+                    function (response) {
+                        if (response.result.artifacts.files.length > 0) {
+                            service.composeSummaryResults(response.result.artifacts.files, response.executionId, phase)
+                                .then(
+                                    function (result) {
+                                        resolve({result: result});
+                                    },
+                                    function (msg) {
+                                        reject(msg.statusText);
+                                    }
+                                );
+                        } else {
+                            resolve({result: {}});
+                        }
+                    },
+                    function (response) {
+                        reject(response);
+                    }
+                );
+            });
+        };
+
+        service.composeSummaryResults = function (files, executionId, phase) {
+            // FIXME: errors from downloadJsonFile do not lead to a reject
+            return $q(function (resolve, reject) {
+                var retObj = {summary: [], allSamples: 0, numberOfRows: 0},
+                    fileExt = {fetch: ['.png', 'json'], preprocess: ['all.png', 'all.json']},
+
+                // find matched items in an array by key
+                    _find = function composeSummaryResults_find(key, array) {
+                        // The variable results needs var in this case (without 'var' a global variable is created)
+                        var results = [];
+                        for (var i = 0; i < array.length; i++) {
+                            if (array[i].search(key) > -1) {
+                                results.push(array[i]);
+                            }
+                        }
+                        return results;
+                    },
+
+                // process each item
+                    _processItem = function composeSummaryResults_processItem(img, json) {
+                        return $q(function (resolve) {
+                            service.downloadJsonFile(executionId, json).then(
+                                function (d) {
+                                    retObj.subsets = d.data.length;
+                                    d.data.forEach(function (subset) {
+                                        retObj.allSamples += subset.numberOfSamples;
+                                        retObj.numberOfRows = subset.totalNumberOfValuesIncludingMissing /
+                                            subset.numberOfSamples;
+                                    });
+                                    resolve({img: service.urlForFile(executionId, img), json: d});
+                                },
+                                function (err) {
+                                    reject(err);
+                                }
+                            );
+                        });
+                    };
+
+                // first identify image and json files
+                var _images = _find(fileExt[phase][0], files),
+                    _jsons = _find(fileExt[phase][1], files);
+
+                // load each json file contents
+                for (var i = 0; i < _images.length; i++) {
+                    retObj.summary.push(_processItem(_images[i], _jsons[i]));
+                }
+
+                $.when.apply($, retObj.summary).then(function () {
+                    resolve(retObj); // when all contents has been loaded
+                });
+            });
+        };
+
+        service.preprocess = function (args) {
+            return $q(function (resolve, reject) {
+                service.startScriptExecution({
+                    taskType: 'preprocess',
+                    arguments: args
+                }).then(
+                    resolve,
+                    function (response) {
+                        reject(response);
+                    }
+                );
+            });
+        };
+
+        return service;
+    }]);
+
+//# sourceURL=smartRUtils.js
+
+'use strict';
+
+angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService', function($q,
+                                                                                           CohortSharingService) {
+
+    var service = {};
+
+    var nodeToKey = function (node) {
+        return node.restObj.key;
+    };
+
+    service.conceptBoxMapToConceptKeys = function smartRUtils_conceptBoxMapToConceptKeys(conceptBoxMap) {
+        var allConcepts = {};
+        Object.keys(conceptBoxMap).forEach(function(group) {
+            var concepts = conceptBoxMap[group].concepts;
+            concepts.forEach(function(concept, idx) {
+                allConcepts[group + '_' + 'n' + idx] = nodeToKey(concept);
+            });
+        });
+        return allConcepts;
+    };
+
+    /**
+     * Creates a CSS safe version of a given string
+     * This should be used consistently across the whole of SmartR to avoid data induced CSS errors
+     *
+     * @param str
+     * @returns {string}
+     */
+    service.makeSafeForCSS = function smartRUtils_makeSafeForCSS(str) {
+        return String(str).replace(/[^a-z0-9]/g, function(s) {
+            var c = s.charCodeAt(0);
+            if (c === 32) {
+                return '-';
+            }
+            if (c >= 65 && c <= 90) {
+                return '_' + s.toLowerCase();
+            }
+            return '__' + ('000' + c.toString(16)).slice(-4);
+        });
+    };
+
+    service.getElementWithoutEventListeners = function(cssSelector) {
+        var element = document.getElementById(cssSelector);
+        var copy = element.cloneNode(true);
+        element.parentNode.replaceChild(copy, element);
+        return copy;
+    };
+
+    service.shortenConcept = function smartRUtils_shortenConcept(concept) {
+        var split = concept.split('\\');
+        split = split.filter(function(str) { return str !== ''; });
+        return split[split.length - 2] + '/' + split[split.length - 1];
+    };
+
+    // Calculate width of text from DOM element or string. By Phil Freo <http://philfreo.com>
+    $.fn.textWidth = function(text, font) {
+        if (!$.fn.textWidth.fakeEl) {
+            $.fn.textWidth.fakeEl = $('<span>').hide().appendTo(document.body);
+        }
+        $.fn.textWidth.fakeEl.text(text || this.val() || this.text()).css('font', font || this.css('font'));
+        return $.fn.textWidth.fakeEl.width();
+    };
+
+    service.getTextWidth = function(text, font) {
+        return $.fn.textWidth(text, font);
+    };
+
+    /**
+     * Executes callback with scroll position when SmartR mainframe is scrolled
+     * @param function
+     */
+    service.callOnScroll = function(callback) {
+        $('#sr-index').parent().scroll(function() {
+            var scrollPos = $(this).scrollTop();
+            callback(scrollPos);
+        });
+    };
+
+    service.prepareWindowSize = function(width, height) {
+        $('#heim-tabs').css('min-width', parseInt(width) + 25);
+        $('#heim-tabs').css('min-height', parseInt(height) + 25);
+    };
+
+    /**
+    * removes all kind of elements that might live out of the viz directive (e.g. tooltips, contextmenu, ...)
+    */
+    service.cleanUp = function() {
+        $('.d3-tip').remove();
+    };
+
+    service.countCohorts = function() {
+        return CohortSharingService.getSelection().length;
+    };
+
+    service.getSubsetIds = function smartRUtil_getSubsetIds() {
+        var defer = $q.defer();
+        defer.resolve(CohortSharingService.getSelection());
+        return defer.promise;
+    };
+
+    return service;
+}]);
 
 
 'use strict';
@@ -4034,6 +4034,406 @@ angular.module('smartRApp')
             });
     }]);
 
+angular.module('smartRApp').directive('volcanoPlot', [
+    'smartRUtils',
+    function(smartRUtils) {
+
+        return {
+            restrict: 'E',
+            scope: {
+                data: '=',
+                width: '@',
+                height: '@'
+            },
+            link: function (scope, element) {
+
+                /**
+                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
+                 */
+                scope.$watch('data', function() {
+                    $(element[0]).empty();
+                    if (!$.isEmptyObject(scope.data)) {
+                        smartRUtils.prepareWindowSize(scope.width, scope.height);
+                        createVolcanoplot(scope, element[0]);
+                    }
+                });
+            }
+        };
+
+        function createVolcanoplot(scope, root) {
+            var uids = scope.data.uids;
+            var pValues = scope.data.pvalValues;
+            var negativeLog10PValues = scope.data.negativeLog10PvalValues;
+            var logFCs = scope.data.logfoldValues;
+
+            var points = negativeLog10PValues.map(function (d, i) {
+                return {
+                    uid: uids[i],
+                    pValue: pValues[i],
+                    negativeLog10PValues: negativeLog10PValues[i],
+                    logFC: logFCs[i]
+                };
+            });
+
+            var currentLogFC = 0.5;
+            var currentNegLog10P = -Math.log10(0.05);
+
+            var margin = {top: 100, right: 100, bottom: 100, left: 100};
+            var width = scope.width - margin.left - margin.right;
+            var height = scope.height - margin.top - margin.bottom;
+
+            var volcanoplot = d3.select(root).append('svg')
+                .style('float', 'left')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+            var tip = d3.tip()
+                .attr('class', 'd3-tip')
+                .offset([-10, 0])
+                .html(function(d) { return d; });
+
+            volcanoplot.call(tip);
+
+            var x = d3.scale.linear()
+                .domain([-Math.max.apply(null, logFCs), Math.max.apply(null, logFCs)])
+                .range([0, width]);
+
+            var y = d3.scale.linear()
+                .domain(d3.extent(negativeLog10PValues))
+                .range([height, 0]);
+
+            var xAxis = d3.svg.axis()
+                .scale(x)
+                .orient('bottom');
+
+            var yAxis = d3.svg.axis()
+                .scale(y)
+                .orient('left');
+
+            volcanoplot.append('g')
+                .attr('class', 'axis')
+                .attr('transform', 'translate(0,' + height + ')')
+                .call(xAxis);
+
+            volcanoplot.append('g')
+                .attr('class', 'axis')
+                .call(yAxis);
+
+            volcanoplot.append('g')
+                .attr('class', 'x axis')
+                .attr('transform', 'translate(0, 0)')
+                .call(d3.svg.axis()
+                    .scale(x)
+                    .ticks(10)
+                    .tickFormat('')
+                    .innerTickSize(height)
+                    .orient('bottom'));
+
+            volcanoplot.append('g')
+                .attr('class', 'y axis')
+                .attr('transform', 'translate(' + width + ',' + 0 + ')')
+                .call(d3.svg.axis()
+                    .scale(y)
+                    .ticks(10)
+                    .tickFormat('')
+                    .innerTickSize(width)
+                    .orient('left'));
+
+            volcanoplot.append('text')
+                .attr('class', 'text axisText')
+                .attr('x', width / 2)
+                .attr('y', height + 40)
+                .attr('text-anchor', 'middle')
+                .text('log2 FC');
+
+            volcanoplot.append('text')
+                .attr('class', 'text axisText')
+                .attr('text-anchor', 'middle')
+                .attr('transform', 'translate(' + (-40) + ',' + (height / 2) + ')rotate(-90)')
+                .text('- log10 p');
+
+            function pDragged() {
+                var yPos = d3.event.y;
+                if (yPos < 0) {
+                    yPos = 0;
+                }
+                if (yPos > height) {
+                    yPos = height;
+                }
+
+                d3.selectAll('.pLine')
+                    .attr('y1', yPos)
+                    .attr('y2', yPos);
+
+                d3.selectAll('.pHandle')
+                    .attr('y', yPos - 6);
+
+                d3.selectAll('.pText')
+                    .attr('y', yPos)
+                    .text('p = ' + (1 / Math.pow(10, y.invert(yPos))).toFixed(5));
+
+                currentNegLog10P = y.invert(yPos);
+
+                d3.selectAll('.point')
+                    .style('fill', function (d) {
+                        return getColor(d);
+                    });
+
+                drawVolcanotable(getTopRankedPoints().data());
+            }
+
+            var pDrag = d3.behavior.drag()
+                .on('drag', pDragged)
+                .on('dragend', d3.tip);
+
+            volcanoplot.append('line')
+                .attr('class', 'pLine')
+                .attr('x1', 0)
+                .attr('y1', y(currentNegLog10P))
+                .attr('x2', width)
+                .attr('y2', y(currentNegLog10P));
+
+            volcanoplot.append('rect')
+                .attr('class', 'pHandle')
+                .attr('x', 0)
+                .attr('y', y(currentNegLog10P) - 6)
+                .attr('width', width)
+                .attr('height', 12)
+                .call(pDrag);
+
+            volcanoplot.append('text')
+                .attr('class', 'text pText')
+                .attr('x', width + 5)
+                .attr('y', y(currentNegLog10P))
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'start')
+                .text('p = 0.0500')
+                .style('fill', 'red');
+
+            function lFCDragged() {
+                var xPos = d3.event.x;
+
+                if (xPos < 0) {
+                    xPos = 0;
+                }
+                if (xPos > width) {
+                    xPos = width;
+                }
+
+                var logFC = x.invert(xPos);
+
+                d3.selectAll('.logFCLine.left')
+                    .attr('x1', x(-Math.abs(logFC)))
+                    .attr('x2', x(-Math.abs(logFC)));
+                d3.selectAll('.logFCHandle.left')
+                    .attr('x', x(-Math.abs(logFC)) - 6);
+                d3.selectAll('.logFCText.left')
+                    .attr('x', x(-Math.abs(logFC)))
+                    .text('log2FC = ' + (-Math.abs(logFC)).toFixed(2));
+
+                d3.selectAll('.logFCLine.right')
+                    .attr('x1', x(Math.abs(logFC)))
+                    .attr('x2', x(Math.abs(logFC)));
+                d3.selectAll('.logFCHandle.right')
+                    .attr('x', x(Math.abs(logFC)) - 6);
+                d3.selectAll('.logFCText.right')
+                    .attr('x', x(Math.abs(logFC)))
+                    .text('log2FC = ' + Math.abs(logFC).toFixed(2));
+
+                currentLogFC = Math.abs(logFC);
+
+                d3.selectAll('.point')
+                    .style('fill', function (d) {
+                        return getColor(d);
+                    });
+
+                drawVolcanotable(getTopRankedPoints().data());
+            }
+
+            var lFCDrag = d3.behavior.drag()
+                .on('drag', lFCDragged);
+
+            volcanoplot.append('line')
+                .attr('class', 'left logFCLine')
+                .attr('x1', x(-currentLogFC))
+                .attr('y1', height)
+                .attr('x2', x(-currentLogFC))
+                .attr('y2', 0);
+
+            volcanoplot.append('rect')
+                .attr('class', 'left logFCHandle')
+                .attr('x', x(-currentLogFC) - 6)
+                .attr('y', 0)
+                .attr('width', 12)
+                .attr('height', height)
+                .call(lFCDrag);
+
+            volcanoplot.append('text')
+                .attr('class', 'text left logFCText')
+                .attr('x', x(-currentLogFC))
+                .attr('y', -15)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'end')
+                .text('log2FC = ' + (-currentLogFC))
+                .style('fill', '#0000FF');
+
+            volcanoplot.append('line')
+                .attr('class', 'right logFCLine')
+                .attr('x1', x(currentLogFC))
+                .attr('y1', height)
+                .attr('x2', x(currentLogFC))
+                .attr('y2', 0);
+
+            volcanoplot.append('rect')
+                .attr('class', 'right logFCHandle')
+                .attr('x', x(currentLogFC) - 6)
+                .attr('y', 0)
+                .attr('width', 12)
+                .attr('height', height)
+                .call(lFCDrag);
+
+            volcanoplot.append('text')
+                .attr('class', 'text right logFCText')
+                .attr('x', x(currentLogFC))
+                .attr('y', -15)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'start')
+                .text('log2FC = ' + currentLogFC)
+                .style('fill', '#0000FF');
+
+            function getTopRankedPoints() {
+                return d3.selectAll('.point').filter(function (d) {
+                    return d.negativeLog10PValues > currentNegLog10P && Math.abs(d.logFC) > currentLogFC;
+                });
+            }
+
+            function getColor(point) {
+                if (point.negativeLog10PValues < currentNegLog10P && Math.abs(point.logFC) < currentLogFC) {
+                    return '#000000';
+                }
+                if (point.negativeLog10PValues >= currentNegLog10P && Math.abs(point.logFC) < currentLogFC) {
+                    return '#FF0000';
+                }
+                if (point.negativeLog10PValues >= currentNegLog10P && Math.abs(point.logFC) >= currentLogFC) {
+                    return '#00FF00';
+                }
+                return '#0000FF';
+            }
+
+            function resetVolcanotable() {
+                d3.selectAll('.volcanoplot-table').remove();
+            }
+
+            function drawVolcanotable(points) {
+                resetVolcanotable();
+                if (!points.length) {
+                    return;
+                }
+                var columns = ['uid', 'logFC', 'negativeLog10PValues', 'pValue'];
+                var HEADER = ['ID', 'log2 FC', '- log10 p', 'p'];
+                var table = d3.select(root).append('table')
+                    .attr('class', 'volcanoplot-table');
+                var thead = table.append('thead');
+                var tbody = table.append('tbody');
+
+                thead.append('tr')
+                    .attr('class', 'mytr')
+                    .selectAll('th')
+                    .data(HEADER)
+                    .enter()
+                    .append('th')
+                    .attr('class', 'myth')
+                    .text(function (d) {
+                        return d;
+                    });
+
+                var rows = tbody.selectAll('tr')
+                    .data(points)
+                    .enter()
+                    .append('tr')
+                    .attr('class', 'mytr');
+
+                rows.selectAll('td')
+                    .data(function (row) {
+                        return columns.map(function (column) {
+                            return {column: column, value: row[column]};
+                        });
+                    })
+                    .enter()
+                    .append('td')
+                    .attr('class', 'text mytd')
+                    .text(function (d) {
+                        return d.value;
+                    });
+            }
+
+            function updateVolcano() {
+                var point = volcanoplot.selectAll('.point')
+                    .data(points, function (d) {
+                        return d.uid;
+                    });
+
+                point.enter()
+                    .append('rect')
+                    .attr('class', function(d) { return 'point uid-' + smartRUtils.makeSafeForCSS(d.uid); })
+                    .attr('x', function (d) {
+                        return x(d.logFC) - 2;
+                    })
+                    .attr('y', function (d) {
+                        return y(d.negativeLog10PValues) - 2;
+                    })
+                    .attr('width', 4)
+                    .attr('height', 4)
+                    .style('fill', function (d) {
+                        return getColor(d);
+                    })
+                    .on('mouseover', function (d) {
+                        var html = 'ID: ' + d.uid + '<br/>' +
+                            'p-value: ' + d.pValue + '<br/>' +
+                            '-log10 p: ' + d.negativeLog10PValues + '<br/>' +
+                            'log2FC: ' + d.logFC;
+                        tip.show(html);
+                    })
+                    .on('mouseout', function () {
+                        tip.hide();
+                    });
+
+                point.exit()
+                    .attr('r', 0)
+                    .remove();
+            }
+
+            updateVolcano();
+            drawVolcanotable(getTopRankedPoints().data());
+        }
+
+    }]);
+
+
+angular.module('smartRApp')
+    .config(["$stateProvider", function ($stateProvider) {
+        $stateProvider
+            .state('volcanoplot', {
+                parent: 'site',
+                url: '/volcanoplot',
+                views: {
+                    '@': {
+                        templateUrl: 'src/containers/volcanoplot/volcanoplot.html'
+                    },
+                    'content@volcanoplot': {
+                        templateUrl: 'src/containers/volcanoplot/volcanoplot.content.html'
+                    },
+                    'sidebar@volcanoplot': {
+                        templateUrl: 'app/components/sidebar/sidebar.html',
+                        controller: 'SidebarCtrl',
+                        controllerAs: 'vm'
+                    }
+                }
+            });
+    }]);
+
 angular.module('smartRApp').directive('timelinePlot', ['smartRUtils', 'rServeService', function(smartRUtils, rServeService) {
 
     return {
@@ -5108,406 +5508,6 @@ angular.module('smartRApp')
                         templateUrl: 'src/containers/timeline/timeline.content.html'
                     },
                     'sidebar@timeline': {
-                        templateUrl: 'app/components/sidebar/sidebar.html',
-                        controller: 'SidebarCtrl',
-                        controllerAs: 'vm'
-                    }
-                }
-            });
-    }]);
-
-angular.module('smartRApp').directive('volcanoPlot', [
-    'smartRUtils',
-    function(smartRUtils) {
-
-        return {
-            restrict: 'E',
-            scope: {
-                data: '=',
-                width: '@',
-                height: '@'
-            },
-            link: function (scope, element) {
-
-                /**
-                 * Watch data model (which is only changed by ajax calls when we want to (re)draw everything)
-                 */
-                scope.$watch('data', function() {
-                    $(element[0]).empty();
-                    if (!$.isEmptyObject(scope.data)) {
-                        smartRUtils.prepareWindowSize(scope.width, scope.height);
-                        createVolcanoplot(scope, element[0]);
-                    }
-                });
-            }
-        };
-
-        function createVolcanoplot(scope, root) {
-            var uids = scope.data.uids;
-            var pValues = scope.data.pvalValues;
-            var negativeLog10PValues = scope.data.negativeLog10PvalValues;
-            var logFCs = scope.data.logfoldValues;
-
-            var points = negativeLog10PValues.map(function (d, i) {
-                return {
-                    uid: uids[i],
-                    pValue: pValues[i],
-                    negativeLog10PValues: negativeLog10PValues[i],
-                    logFC: logFCs[i]
-                };
-            });
-
-            var currentLogFC = 0.5;
-            var currentNegLog10P = -Math.log10(0.05);
-
-            var margin = {top: 100, right: 100, bottom: 100, left: 100};
-            var width = scope.width - margin.left - margin.right;
-            var height = scope.height - margin.top - margin.bottom;
-
-            var volcanoplot = d3.select(root).append('svg')
-                .style('float', 'left')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .append('g')
-                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
-
-            var tip = d3.tip()
-                .attr('class', 'd3-tip')
-                .offset([-10, 0])
-                .html(function(d) { return d; });
-
-            volcanoplot.call(tip);
-
-            var x = d3.scale.linear()
-                .domain([-Math.max.apply(null, logFCs), Math.max.apply(null, logFCs)])
-                .range([0, width]);
-
-            var y = d3.scale.linear()
-                .domain(d3.extent(negativeLog10PValues))
-                .range([height, 0]);
-
-            var xAxis = d3.svg.axis()
-                .scale(x)
-                .orient('bottom');
-
-            var yAxis = d3.svg.axis()
-                .scale(y)
-                .orient('left');
-
-            volcanoplot.append('g')
-                .attr('class', 'axis')
-                .attr('transform', 'translate(0,' + height + ')')
-                .call(xAxis);
-
-            volcanoplot.append('g')
-                .attr('class', 'axis')
-                .call(yAxis);
-
-            volcanoplot.append('g')
-                .attr('class', 'x axis')
-                .attr('transform', 'translate(0, 0)')
-                .call(d3.svg.axis()
-                    .scale(x)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(height)
-                    .orient('bottom'));
-
-            volcanoplot.append('g')
-                .attr('class', 'y axis')
-                .attr('transform', 'translate(' + width + ',' + 0 + ')')
-                .call(d3.svg.axis()
-                    .scale(y)
-                    .ticks(10)
-                    .tickFormat('')
-                    .innerTickSize(width)
-                    .orient('left'));
-
-            volcanoplot.append('text')
-                .attr('class', 'text axisText')
-                .attr('x', width / 2)
-                .attr('y', height + 40)
-                .attr('text-anchor', 'middle')
-                .text('log2 FC');
-
-            volcanoplot.append('text')
-                .attr('class', 'text axisText')
-                .attr('text-anchor', 'middle')
-                .attr('transform', 'translate(' + (-40) + ',' + (height / 2) + ')rotate(-90)')
-                .text('- log10 p');
-
-            function pDragged() {
-                var yPos = d3.event.y;
-                if (yPos < 0) {
-                    yPos = 0;
-                }
-                if (yPos > height) {
-                    yPos = height;
-                }
-
-                d3.selectAll('.pLine')
-                    .attr('y1', yPos)
-                    .attr('y2', yPos);
-
-                d3.selectAll('.pHandle')
-                    .attr('y', yPos - 6);
-
-                d3.selectAll('.pText')
-                    .attr('y', yPos)
-                    .text('p = ' + (1 / Math.pow(10, y.invert(yPos))).toFixed(5));
-
-                currentNegLog10P = y.invert(yPos);
-
-                d3.selectAll('.point')
-                    .style('fill', function (d) {
-                        return getColor(d);
-                    });
-
-                drawVolcanotable(getTopRankedPoints().data());
-            }
-
-            var pDrag = d3.behavior.drag()
-                .on('drag', pDragged)
-                .on('dragend', d3.tip);
-
-            volcanoplot.append('line')
-                .attr('class', 'pLine')
-                .attr('x1', 0)
-                .attr('y1', y(currentNegLog10P))
-                .attr('x2', width)
-                .attr('y2', y(currentNegLog10P));
-
-            volcanoplot.append('rect')
-                .attr('class', 'pHandle')
-                .attr('x', 0)
-                .attr('y', y(currentNegLog10P) - 6)
-                .attr('width', width)
-                .attr('height', 12)
-                .call(pDrag);
-
-            volcanoplot.append('text')
-                .attr('class', 'text pText')
-                .attr('x', width + 5)
-                .attr('y', y(currentNegLog10P))
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'start')
-                .text('p = 0.0500')
-                .style('fill', 'red');
-
-            function lFCDragged() {
-                var xPos = d3.event.x;
-
-                if (xPos < 0) {
-                    xPos = 0;
-                }
-                if (xPos > width) {
-                    xPos = width;
-                }
-
-                var logFC = x.invert(xPos);
-
-                d3.selectAll('.logFCLine.left')
-                    .attr('x1', x(-Math.abs(logFC)))
-                    .attr('x2', x(-Math.abs(logFC)));
-                d3.selectAll('.logFCHandle.left')
-                    .attr('x', x(-Math.abs(logFC)) - 6);
-                d3.selectAll('.logFCText.left')
-                    .attr('x', x(-Math.abs(logFC)))
-                    .text('log2FC = ' + (-Math.abs(logFC)).toFixed(2));
-
-                d3.selectAll('.logFCLine.right')
-                    .attr('x1', x(Math.abs(logFC)))
-                    .attr('x2', x(Math.abs(logFC)));
-                d3.selectAll('.logFCHandle.right')
-                    .attr('x', x(Math.abs(logFC)) - 6);
-                d3.selectAll('.logFCText.right')
-                    .attr('x', x(Math.abs(logFC)))
-                    .text('log2FC = ' + Math.abs(logFC).toFixed(2));
-
-                currentLogFC = Math.abs(logFC);
-
-                d3.selectAll('.point')
-                    .style('fill', function (d) {
-                        return getColor(d);
-                    });
-
-                drawVolcanotable(getTopRankedPoints().data());
-            }
-
-            var lFCDrag = d3.behavior.drag()
-                .on('drag', lFCDragged);
-
-            volcanoplot.append('line')
-                .attr('class', 'left logFCLine')
-                .attr('x1', x(-currentLogFC))
-                .attr('y1', height)
-                .attr('x2', x(-currentLogFC))
-                .attr('y2', 0);
-
-            volcanoplot.append('rect')
-                .attr('class', 'left logFCHandle')
-                .attr('x', x(-currentLogFC) - 6)
-                .attr('y', 0)
-                .attr('width', 12)
-                .attr('height', height)
-                .call(lFCDrag);
-
-            volcanoplot.append('text')
-                .attr('class', 'text left logFCText')
-                .attr('x', x(-currentLogFC))
-                .attr('y', -15)
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'end')
-                .text('log2FC = ' + (-currentLogFC))
-                .style('fill', '#0000FF');
-
-            volcanoplot.append('line')
-                .attr('class', 'right logFCLine')
-                .attr('x1', x(currentLogFC))
-                .attr('y1', height)
-                .attr('x2', x(currentLogFC))
-                .attr('y2', 0);
-
-            volcanoplot.append('rect')
-                .attr('class', 'right logFCHandle')
-                .attr('x', x(currentLogFC) - 6)
-                .attr('y', 0)
-                .attr('width', 12)
-                .attr('height', height)
-                .call(lFCDrag);
-
-            volcanoplot.append('text')
-                .attr('class', 'text right logFCText')
-                .attr('x', x(currentLogFC))
-                .attr('y', -15)
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'start')
-                .text('log2FC = ' + currentLogFC)
-                .style('fill', '#0000FF');
-
-            function getTopRankedPoints() {
-                return d3.selectAll('.point').filter(function (d) {
-                    return d.negativeLog10PValues > currentNegLog10P && Math.abs(d.logFC) > currentLogFC;
-                });
-            }
-
-            function getColor(point) {
-                if (point.negativeLog10PValues < currentNegLog10P && Math.abs(point.logFC) < currentLogFC) {
-                    return '#000000';
-                }
-                if (point.negativeLog10PValues >= currentNegLog10P && Math.abs(point.logFC) < currentLogFC) {
-                    return '#FF0000';
-                }
-                if (point.negativeLog10PValues >= currentNegLog10P && Math.abs(point.logFC) >= currentLogFC) {
-                    return '#00FF00';
-                }
-                return '#0000FF';
-            }
-
-            function resetVolcanotable() {
-                d3.selectAll('.volcanoplot-table').remove();
-            }
-
-            function drawVolcanotable(points) {
-                resetVolcanotable();
-                if (!points.length) {
-                    return;
-                }
-                var columns = ['uid', 'logFC', 'negativeLog10PValues', 'pValue'];
-                var HEADER = ['ID', 'log2 FC', '- log10 p', 'p'];
-                var table = d3.select(root).append('table')
-                    .attr('class', 'volcanoplot-table');
-                var thead = table.append('thead');
-                var tbody = table.append('tbody');
-
-                thead.append('tr')
-                    .attr('class', 'mytr')
-                    .selectAll('th')
-                    .data(HEADER)
-                    .enter()
-                    .append('th')
-                    .attr('class', 'myth')
-                    .text(function (d) {
-                        return d;
-                    });
-
-                var rows = tbody.selectAll('tr')
-                    .data(points)
-                    .enter()
-                    .append('tr')
-                    .attr('class', 'mytr');
-
-                rows.selectAll('td')
-                    .data(function (row) {
-                        return columns.map(function (column) {
-                            return {column: column, value: row[column]};
-                        });
-                    })
-                    .enter()
-                    .append('td')
-                    .attr('class', 'text mytd')
-                    .text(function (d) {
-                        return d.value;
-                    });
-            }
-
-            function updateVolcano() {
-                var point = volcanoplot.selectAll('.point')
-                    .data(points, function (d) {
-                        return d.uid;
-                    });
-
-                point.enter()
-                    .append('rect')
-                    .attr('class', function(d) { return 'point uid-' + smartRUtils.makeSafeForCSS(d.uid); })
-                    .attr('x', function (d) {
-                        return x(d.logFC) - 2;
-                    })
-                    .attr('y', function (d) {
-                        return y(d.negativeLog10PValues) - 2;
-                    })
-                    .attr('width', 4)
-                    .attr('height', 4)
-                    .style('fill', function (d) {
-                        return getColor(d);
-                    })
-                    .on('mouseover', function (d) {
-                        var html = 'ID: ' + d.uid + '<br/>' +
-                            'p-value: ' + d.pValue + '<br/>' +
-                            '-log10 p: ' + d.negativeLog10PValues + '<br/>' +
-                            'log2FC: ' + d.logFC;
-                        tip.show(html);
-                    })
-                    .on('mouseout', function () {
-                        tip.hide();
-                    });
-
-                point.exit()
-                    .attr('r', 0)
-                    .remove();
-            }
-
-            updateVolcano();
-            drawVolcanotable(getTopRankedPoints().data());
-        }
-
-    }]);
-
-
-angular.module('smartRApp')
-    .config(["$stateProvider", function ($stateProvider) {
-        $stateProvider
-            .state('volcanoplot', {
-                parent: 'site',
-                url: '/volcanoplot',
-                views: {
-                    '@': {
-                        templateUrl: 'src/containers/volcanoplot/volcanoplot.html'
-                    },
-                    'content@volcanoplot': {
-                        templateUrl: 'src/containers/volcanoplot/volcanoplot.content.html'
-                    },
-                    'sidebar@volcanoplot': {
                         templateUrl: 'app/components/sidebar/sidebar.html',
                         controller: 'SidebarCtrl',
                         controllerAs: 'vm'
