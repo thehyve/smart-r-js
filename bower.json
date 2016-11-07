@@ -13,6 +13,7 @@
   "homepage": "https://github.com/thehyve/smart-r-js",
   "description": "SmartR JS angular plugin for a transmart UI.",
   "main": [
+    "dist/images/*.*",
     "dist/smart-r-js.js",
     "dist/smart-r-js.css"
   ],
