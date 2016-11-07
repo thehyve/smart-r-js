@@ -1,6 +1,6 @@
 {
   "name": "smart-r-js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "dependencies": {
     "angular": "^1.5.8",
     "d3-tip": "^0.7.1",
