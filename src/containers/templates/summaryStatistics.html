@@ -8,7 +8,7 @@
     </tr>
     </thead>
     <tr ng-repeat="item in summaryData.summary" >
-        <td><img src="{{item.$$state.value.img}}" width="300px"></td>
+        <td><img ng-src="{{images[item.$$state.value.img]}}" width="300px"></td>
         <td>
             <ul ng-repeat="(key, value) in item.$$state.value.json.data[0]">
                 <li>{{key}} : </li>

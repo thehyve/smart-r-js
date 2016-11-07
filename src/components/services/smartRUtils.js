@@ -125,29 +125,7 @@ angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService'
 
     service.getSubsetIds = function smartRUtil_getSubsetIds() {
         var defer = $q.defer();
-
-        function resolveResult() {
-            var res = window.GLOBAL.CurrentSubsetIDs.slice(1).map(function (v) {
-                return v || null;
-            });
-            if (res.some(function (el) {
-                return el !== null;
-            })) {
-                defer.resolve(res);
-            } else {
-                defer.reject();
-            }
-        }
-
-        for (var i = 1; i <= window.GLOBAL.NumOfSubsets; i++) {
-            if (!window.isSubsetEmpty(i) && !window.GLOBAL.CurrentSubsetIDs[i]) {
-                window.runAllQueries(resolveResult, window.smartRPanel);
-                return defer.promise;
-            }
-        }
-
-        resolveResult();
-
+        defer.resolve(CohortSharingService.getSelection());
         return defer.promise;
     };
 

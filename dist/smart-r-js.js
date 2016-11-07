@@ -29,26 +29,26 @@ angular.module('smartRApp', [ 'transmartBaseUiConstants', 'tmEndpoints'])
 
 angular.module('smartRApp').run(['$templateCache', function($templateCache) {$templateCache.put('src/containers/boxplot/boxplot.content.html','<div class="main-container">\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="1" max="1" label="Numerical Variable" tooltip="Select a single numerical variable that you would like to have displayed.">\n            </concept-box>\n            <!----Nice idea but somehow lost it\'s initial purpose because cross-study support is gone.\n            Maybe implement later--->\n            <!----<concept-box style="display: inline-block;"--->\n                             <!----concept-group="fetch.conceptBoxes.subsets"--->\n                             <!----type="LD-categorical"--->\n                             <!----min="0"--->\n                             <!----max="-1"--->\n                             <!----label="(optional) Categorical Variables"--->\n                             <!----tooltip="Select an arbitrary amount of categorical variables to split the numerical variable into subsets.">--->\n            <!----</concept-box>--->\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1,2]">\n            </fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <br>\n            <br>\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="boxplot.svg" target="boxplot"></capture-plot-button>\n            <br>\n            <br>\n            <boxplot data="runAnalysis.scriptResults" width="1000" height="500"></boxplot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
 $templateCache.put('src/containers/boxplot/boxplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="40%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/correlation/correlation.content.html','<div ng-controller="CorrelationController" class="main-container">\n\n        <tab-container>\n\n            <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="2" max="2" label="Numerical Variables" tooltip="Select two numerical variables from the tree to compare them.">\n                </concept-box>\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.annotations" type="LD-categorical" min="0" max="-1" label="(optional) Categorical Variables" tooltip="Select an arbitrary amount of categorical variables from the tree to annotate the numerical datapoints.">\n                </concept-box>\n                <br>\n                <br>\n                <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1]">\n                </fetch-button>\n            </workflow-tab>\n\n            <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n                <div class="heim-input-field sr-input-area">\n                    <h2>Data transformation:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="raw" checked="checked"> Raw Values\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log2" checked="checked"> Log2\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log10" checked="checked"> Log10\n\n                        </label>\n                    </fieldset>\n                </div>\n                <div class="heim-input-field sr-input-area">\n                    <h2>Correlation computation method:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="pearson" checked="checked"> Pearson\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="kendall"> Kendall\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="spearman"> Spearman\n                        </label>\n                    </fieldset>\n                </div>\n                <hr class="sr-divider">\n                <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n                </run-button>\n                <capture-plot-button filename="correlation.svg" target="correlation-plot"></capture-plot-button>\n                <br>\n                <br>\n                <correlation-plot data="runAnalysis.scriptResults" width="1500" height="1500"></correlation-plot>\n            </workflow-tab>\n\n        </tab-container>\n\n    </div>\n\n\n');
+$templateCache.put('src/containers/correlation/correlation.content.html','<div ng-controller="CorrelationController" class="main-container">\n\n        <tab-container>\n\n            <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.datapoints" type="LD-numerical" min="2" max="2" label="Numerical Variables" tooltip="Select two numerical variables from the tree to compare them.">\n                </concept-box>\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.annotations" type="LD-categorical" min="0" max="-1" label="(optional) Categorical Variables" tooltip="Select an arbitrary amount of categorical variables from the tree to annotate the numerical datapoints.">\n                </concept-box>\n                <br>\n                <br>\n                <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[1]">\n                </fetch-button>\n            </workflow-tab>\n\n            <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n                <div class="heim-input-field sr-input-area">\n                    <h2>Data transformation:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="raw" checked="checked"> Raw Values\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log2" checked="checked"> Log2\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.transformation" value="log10" checked="checked"> Log10\n\n                        </label>\n                    </fieldset>\n                </div>\n                <div class="heim-input-field sr-input-area">\n                    <h2>Correlation computation method:</h2>\n                    <fieldset class="heim-radiogroup">\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="pearson" checked="checked"> Pearson\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="kendall"> Kendall\n                        </label>\n                        <label>\n                            <input type="radio" ng-model="runAnalysis.params.method" value="spearman"> Spearman\n                        </label>\n                    </fieldset>\n                </div>\n                <hr class="sr-divider">\n                <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" running="runAnalysis.running">\n                </run-button>\n                <capture-plot-button filename="correlation.svg" target="correlation-plot"></capture-plot-button>\n                <br>\n                <br>\n                <correlation-plot data="runAnalysis.scriptResults" width="1500" height="1500"></correlation-plot>\n            </workflow-tab>\n\n        </tab-container>\n\n    </div>\n');
 $templateCache.put('src/containers/correlation/correlation.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/heatmap/heatmap.content.html','<div ng-controller="HeatmapController" class="main-container">\n\n    <tab-container>\n        <!----========================================================================================================-->\n        <!---- Fetch Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional" tooltip="Select high dimensional data node(s) from the data tree and drag it into the box.\n                The nodes need to be from the same platform.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.numeric" type="LD-numerical" min="0" max="-1" label="(optional) Numerical Variables" tooltip="Select numeric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.categoric" type="LD-categorical" min="0" max="-1" label="(optional) Categoric Variables" tooltip="Select categoric data node(s) from the data tree and drag it into the box.">\n            </concept-box>\n\n            <biomarker-selection biomarkers="fetch.selectedBiomarkers"></biomarker-selection>\n            <hr class="sr-divider">\n            <fetch-button loaded="fetch.loaded" running="fetch.running" concept-map="fetch.conceptBoxes" biomarkers="fetch.selectedBiomarkers" show-summary-stats="true" summary-data="fetch.scriptResults" all-samples="common.totalSamples" allowed-cohorts="[1,2]" number-of-rows="common.numberOfRows" has-preprocess-tab="true">\n            </fetch-button>\n            <br>\n            <summary-stats summary-data="fetch.scriptResults"></summary-stats>\n        </workflow-tab>\n\n        <!----========================================================================================================-->\n        <!---- Preprocess Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Preprocess" disabled="preprocess.disabled">\n            <!----Aggregate Probes-->\n            <div class="heim-input-field">\n                <input type="checkbox" ng-model="preprocess.params.aggregate">\n                <span>Aggregate probes</span>\n            </div>\n\n            <hr class="sr-divider">\n\n            <preprocess-button params="preprocess.params" show-summary-stats="true" summary-data="preprocess.scriptResults" running="preprocess.running" all-samples="common.totalSamples" number-of-rows="common.numberOfRows">\n            </preprocess-button>\n\n            <br>\n            <summary-stats summary-data="preprocess.scriptResults"></summary-stats>\n        </workflow-tab>\n\n\n        <!----========================================================================================================-->\n        <!----Run Analysis-->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <!----Number of max row to display-->\n            <div class="heim-input-field heim-input-number sr-input-area">\n                Show <input type="text" id="txtMaxRow" ng-model="runAnalysis.params.max_row">\n                of {{ common.numberOfRows }} rows in total. ( less than 1000 is preferable. )\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <h2>Group columns by:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="nodes" checked="checked"> Node Order\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="subjects">\n                        Subject ID\n                    </label>\n                </fieldset>\n            </div>\n\n            <div class="heim-input-field sr-input-area">\n                <h2>I have read and accept the <a href="http://www.lifemapsc.com/genecards-suite-terms-of-use/" target="_blank">\n                    GeneCards TOU</a>\n                </h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="true"> yes (use GeneCards)\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="false" checked="checked"> no (use EMBL EBI)\n                    </label>\n                </fieldset>\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <sorting-criteria criteria="runAnalysis.params.ranking" samples="common.totalSamples" subsets="common.subsets">\n                </sorting-criteria>\n            </div>\n\n            <hr class="sr-divider">\n\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="heatmap.json" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="heatmap.svg" disabled="runAnalysis.download.disabled" target="heatmap-plot">\n            </capture-plot-button>\n            <download-results-button disabled="runAnalysis.download.disabled"></download-results-button>\n            <br>\n            <workflow-warnings warnings="runAnalysis.scriptResults.warnings"></workflow-warnings>\n            <heatmap-plot data="runAnalysis.scriptResults" width="1200" height="1200" params="runAnalysis.params">\n            </heatmap-plot>\n\n        </workflow-tab>\n\n    </tab-container>\n</div>\n');
+$templateCache.put('src/containers/heatmap/heatmap.content.html','<div ng-controller="HeatmapController" class="main-container">\n\n    <tab-container>\n        <!----========================================================================================================-->\n        <!---- Fetch Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n            <concept-box concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional" tooltip="Select high dimensional data node(s) from the Data Set Explorer Tree and drag it into the box.\n                The nodes needs to be from the same platform.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.numeric" type="LD-numerical" min="0" max="-1" label="Numeric Variables" tooltip="Select numeric data node(s) from the Data Set Explorer Tree and drag it into the box.">\n            </concept-box>\n\n            <concept-box concept-group="fetch.conceptBoxes.categoric" type="LD-categorical" min="0" max="-1" label="Categoric Variables" tooltip="Select categoric data node(s) from the Data Set Explorer Tree and drag it into the box.">\n            </concept-box>\n\n            <biomarker-selection biomarkers="fetch.selectedBiomarkers"></biomarker-selection>\n            <hr class="sr-divider">\n            <fetch-button loaded="fetch.loaded" running="fetch.running" concept-map="fetch.conceptBoxes" biomarkers="fetch.selectedBiomarkers" show-summary-stats="true" summary-data="fetch.scriptResults" all-samples="common.totalSamples" allowed-cohorts="[1,2]" number-of-rows="common.numberOfRows" has-preprocess-tab="true">\n            </fetch-button>\n            <br>\n            <summary-stats summary-data="fetch.scriptResults"></summary-stats>\n        </workflow-tab>\n\n        <!----========================================================================================================-->\n        <!---- Preprocess Data -->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Preprocess" disabled="preprocess.disabled">\n            <!----Aggregate Probes-->\n            <div class="heim-input-field">\n                <input type="checkbox" ng-model="preprocess.params.aggregate">\n                <span>Aggregate probes</span>\n            </div>\n\n            <hr class="sr-divider">\n\n            <preprocess-button params="preprocess.params" show-summary-stats="true" summary-data="preprocess.scriptResults" running="preprocess.running" all-samples="common.totalSamples" number-of-rows="common.numberOfRows">\n            </preprocess-button>\n\n            <br>\n            <summary-stats summary-data="preprocess.scriptResults"></summary-stats>\n        </workflow-tab>\n\n\n        <!----========================================================================================================-->\n        <!----Run Analysis-->\n        <!----========================================================================================================-->\n        <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n            <!----Number of max row to display-->\n            <div class="heim-input-field heim-input-number sr-input-area">\n                Show <input type="text" id="txtMaxRow" ng-model="runAnalysis.params.max_row">\n                of {{ common.numberOfRows }} rows in total. ( less than 1000 is preferable. )\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <h2>Group columns by:</h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="nodes" checked="checked"> Node Order\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.sorting" name="sortingSelect" value="subjects">\n                        Subject ID\n                    </label>\n                </fieldset>\n            </div>\n\n            <div class="heim-input-field sr-input-area">\n                <h2>I have read and accept the <a href="http://www.lifemapsc.com/genecards-suite-terms-of-use/" target="_blank">\n                    GeneCards TOU</a>\n                </h2>\n                <fieldset class="heim-radiogroup">\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="true"> yes (use GeneCards)\n                    </label>\n                    <label>\n                        <input type="radio" ng-model="runAnalysis.params.geneCardsAllowed" name="geneCardsAllowedSelect" ng-value="false" checked="checked"> no (use EMBL EBI)\n                    </label>\n                </fieldset>\n            </div>\n\n            <!----Type of sorting to apply-->\n            <div class="heim-input-field sr-input-area">\n                <sorting-criteria criteria="runAnalysis.params.ranking" samples="common.totalSamples" subsets="common.subsets">\n                </sorting-criteria>\n            </div>\n\n            <hr class="sr-divider">\n\n            <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="heatmap.json" running="runAnalysis.running">\n            </run-button>\n            <capture-plot-button filename="heatmap.svg" disabled="runAnalysis.download.disabled" target="heatmap-plot">\n            </capture-plot-button>\n            <download-results-button disabled="runAnalysis.download.disabled"></download-results-button>\n            <br>\n            <workflow-warnings warnings="runAnalysis.scriptResults.warnings"></workflow-warnings>\n            <heatmap-plot data="runAnalysis.scriptResults" width="1200" height="1200" params="runAnalysis.params">\n            </heatmap-plot>\n\n        </workflow-tab>\n\n    </tab-container>\n</div>\n');
 $templateCache.put('src/containers/heatmap/heatmap.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
 $templateCache.put('src/containers/templates/biomarkerSelection.html','<div class="sr-fetch-params-area">\n  <div class="heim-input-field heim-autocomplete">\n    <label for="heim-input-txt-identifier">Select a biomarker:</label>\n    <input id="heim-input-txt-identifier">\n    <span style="color: darkgrey"> Biomarker can be a gene, pathway, mirID or UniProtID.</span>\n    <div id="heim-input-list-identifiers">\n      <ul><li ng-repeat="biomarker in biomarkers">\n        <div>\n          <span class="identifier-type">{{biomarker.type}} </span>\n          <span class="identifier-name">{{biomarker.name}} </span>\n          <span class="identifier-synonyms">{{biomarker.synonyms}} </span>\n        </div>\n        <button class="identifier-delete" ng-click="removeIdentifier(biomarker)">&#x2716;</button>\n      </li></ul>\n    </div>\n  </div>\n</div>\n');
 $templateCache.put('src/containers/templates/boxplot.html','<workflow-controls ng-show="showControls">\n    <div>\n        <label for="sr-boxplot-log-check">Log2</label>\n        <input type="checkbox" id="sr-boxplot-log-check">\n    </div>\n    <div>\n        <label for="sr-boxplot-jitter-check">Jitter</label>\n        <input type="checkbox" id="sr-boxplot-jitter-check">\n    </div>\n    <div>\n        <label for="sr-boxplot-kde-check">KDE</label>\n        <input type="checkbox" id="sr-boxplot-kde-check">\n    </div>\n    <div>\n        <input type="button" id="sr-boxplot-reset-btn" value="Reset">\n    </div>\n    <div>\n        <input type="button" id="sr-boxplot-remove-btn" value="Remove Outliers">\n    </div>\n</workflow-controls>\n<div id="visualisation"></div>\n');
-$templateCache.put('src/containers/templates/conceptBox.html','<div class="heim-input-field heim-dropzone sr-hd-input">\n    <label style="display: inline">{{label}} <i class="ui-icon ui-icon-info sr-tooltip-dialog" title="{{tooltip}}"> </i></label>\n    <br><br>\n    <span ng-show="instructionMinNodes" class="sr-instruction">Drag at least {{min}} node(s) into the box<br></span>\n    <span ng-show="instructionMaxNodes" class="sr-instruction">Select at most {{max}} node(s)<br></span>\n    <span ng-show="instructionNodeType" class="sr-instruction">Node(s) do not have the correct type<br></span>\n    <span ng-show="instructionNodePlatform" class="sr-instruction">Nodes must have the same platform</span>\n    <div class="sr-drop-input" ng-class="{true:\'sr-drop-input-valid\', false:\'sr-drop-input-invalid\'}[conceptGroup.valid]" style="overflow-y:auto">\n    </div>\n    <div style="margin-top: 10px; text-align: right">\n        <input type="button" value="Clear Window" class="sr-drop-btn">\n    </div>\n</div>\n');
+$templateCache.put('src/containers/templates/conceptBox.html','<div class="heim-input-field heim-dropzone sr-hd-input" data-drop="true" ng-model="droppedNode" jqyoui-droppable="{multiple:true, onDrop:\'onNodeDropEvent(droppedNode)\'}">\n    <label style="display: inline">{{label}} <i class="ui-icon ui-icon-info sr-tooltip-dialog" title="{{tooltip}}"> </i></label>\n    <br><br>\n    <span ng-show="instructionMinNodes" class="sr-instruction">Drag at least {{min}} node(s) into the box<br></span>\n    <span ng-show="instructionMaxNodes" class="sr-instruction">Select at most {{max}} node(s)<br></span>\n    <span ng-show="instructionNodeType" class="sr-instruction">Node(s) do not have the correct type<br></span>\n    <span ng-show="instructionNodePlatform" class="sr-instruction">Nodes must have the same platform</span>\n    <div class="sr-drop-input" ng-class="{true:\'sr-drop-input-valid\', false:\'sr-drop-input-invalid\'}[conceptGroup.valid]" style="overflow-y:auto">\n        <ul>\n            <li ng-repeat="node in conceptGroup.concepts"> {{node.title}}</li>\n        </ul>\n    </div>\n\n\n    <div style="margin-top: 10px; text-align: right">\n        <input type="button" value="Clear Window" class="sr-drop-btn">\n    </div>\n</div>\n');
 $templateCache.put('src/containers/templates/fetchButton.html','<input type="button" value="Fetch Data" class="heim-action-button">\n<span style="padding-left: 10px"></span>');
 $templateCache.put('src/containers/templates/heatmap.html','<workflow-controls ng-show="showControls">\n    <div>\n        <input type="checkbox" id="sr-heatmap-animate-check" checked="checked">\n        <label for="sr-heatmap-animate-check">Animate</label>\n    </div>\n    <div>\n        <div>\n            <input type="button" id="sr-heatmap-cutoff-btn" value="Apply Cutoff">\n            <input type="range" id="sr-heatmap-cutoff-range" min="0" step="1" value="0">\n        </div>\n        <label for="sr-heatmap-zoom-range">Zoom</label>\n        <input type="range" id="sr-heatmap-zoom-range" min="1" max="200" step="5" value="100">\n    </div>\n    <div>\n        <select id="sr-heatmap-cluster-select">\n            <option disabled="disabled" selected="selected" value> -- select a clustering -- </option>\n            <option value="hclustEuclideanAverage">Hierarch.-Eucl.-Avg.</option>\n            <option value="hclustEuclideanComplete">Hierarch.-Eucl.-Complete</option>\n            <option value="hclustEuclideanSingle">Hierarch.-Eucl.-Single</option>\n            <option value="hclustManhattanAverage">Hierarch.-Manhat.-Avg.</option>\n            <option value="hclustManhattanComplete">Hierarch.-Manhat.-Complete</option>\n            <option value="hclustManhattanSingle">Hierarch.-Manhat.-Single</option>\n        </select><br>\n        <div>\n            <input type="checkbox" id="sr-heatmap-row-check" checked="checked">\n            <label for="sr-heatmap-row-check">Cluster Row</label>\n            <input type="checkbox" id="sr-heatmap-col-check" checked="checked">\n            <label for="sr-heatmap-col-check">Cluster Col</label>\n        </div>\n    </div>\n    <div>\n        <select id="sr-heatmap-ranking-select">\n        </select><br>\n        <select id="sr-heatmap-color-select">\n            <option value="redGreen" selected="selected">Red to Green Schema</option>\n            <option value="redBlue">Red to Blue Schema</option>\n            <option value="blueScale">Blue Schema</option>\n            <option value="greenScale">Green Schema</option>\n        </select>\n    </div>\n</workflow-controls>\n<div id="visualisation"></div>\n');
 $templateCache.put('src/containers/templates/preprocessButton.html','<input type="button" value="Preprocess" class="heim-action-button">\n<span style="padding-left: 10px"></span>');
 $templateCache.put('src/containers/templates/runButton.html','<input type="button" value="{{name}}">\n<span style="padding-left: 10px"></span>\n');
 $templateCache.put('src/containers/templates/sortingCriteria.html','<h2>Ranking Criteria:</h2>\n<div class="heim-input-field-sub" id="sr-non-multi-subset">\n    <fieldset class="heim-radiogroup" id="sr-variability-group" ng-disabled="samples < 2">\n        <h3>Expression variability</h3>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="coef"> Coefficient of variation\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="variance"> Variance\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="range"> Range between max and min after\n            excluding outliers\n        </label></div>\n    </fieldset>\n    <fieldset class="heim-radiogroup" id="sr-expression-level-group">\n        <h3>Expression level</h3>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="mean"> Mean\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="median"> Median\n        </label></div>\n    </fieldset>\n</div>\n<div class="heim-input-field-sub" id="sr-multi-subset">\n    <fieldset class="heim-radiogroup" id="sr-differential-exp-group" ng-disabled="subsets < 2">\n        <h3>Differential expression</h3>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="bval"> B-value/log odds ratio\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="pval"> p-value\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="adjpval"> Adjusted p-value (method \u201Cfdr\u201D)\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="logfold"> log fold-change\n        </label></div>\n        <div><label>\n            <input type="radio" ng-model="criteria" value="ttest"> t-statistic\n        </label></div>\n    </fieldset>\n</div>\n');
-$templateCache.put('src/containers/templates/summaryStatistics.html','<table class="sr-summary-table" ng-if="summaryData.summary.length > 0">\n    <thead>\n    <tr>\n        <th>Plot</th>\n        <th>Labels</th>\n        <th>Subset 1</th>\n        <th ng-if="summaryData.summary[0].$$state.value.json.data.length > 1">Subset 2</th>\n    </tr>\n    </thead>\n    <tr ng-repeat="item in summaryData.summary">\n        <td><img src="{{item.$$state.value.img}}" width="300px"></td>\n        <td>\n            <ul ng-repeat="(key, value) in item.$$state.value.json.data[0]">\n                <li>{{key}} : </li>\n            </ul>\n        </td>\n        <td>\n            <ul ng-repeat="(key, value) in item.$$state.value.json.data[0]">\n                <li>{{value}}</li>\n            </ul>\n        </td>\n        <td ng-if="item.$$state.value.json.data.length > 1">\n            <ul ng-repeat="(key, value) in item.$$state.value.json.data[1]">\n                <li>{{value}}</li>\n            </ul>\n        </td>\n    </tr>\n</table>\n');
+$templateCache.put('src/containers/templates/summaryStatistics.html','<table class="sr-summary-table" ng-if="summaryData.summary.length > 0">\n    <thead>\n    <tr>\n        <th>Plot</th>\n        <th>Labels</th>\n        <th>Subset 1</th>\n        <th ng-if="summaryData.summary[0].$$state.value.json.data.length > 1">Subset 2</th>\n    </tr>\n    </thead>\n    <tr ng-repeat="item in summaryData.summary">\n        <td><img ng-src="{{images[item.$$state.value.img]}}" width="300px"></td>\n        <td>\n            <ul ng-repeat="(key, value) in item.$$state.value.json.data[0]">\n                <li>{{key}} : </li>\n            </ul>\n        </td>\n        <td>\n            <ul ng-repeat="(key, value) in item.$$state.value.json.data[0]">\n                <li>{{value}}</li>\n            </ul>\n        </td>\n        <td ng-if="item.$$state.value.json.data.length > 1">\n            <ul ng-repeat="(key, value) in item.$$state.value.json.data[1]">\n                <li>{{value}}</li>\n            </ul>\n        </td>\n    </tr>\n</table>\n');
 $templateCache.put('src/containers/templates/tabContainer.html','<div id="heim-tabs" style="margin-top: 25px">\n    <ul>\n        <li class="heim-tab" ng-repeat="tab in tabs">\n            <a href="#{{tab.id}}" ng-style="{\'color\': tab.disabled ? \'grey\' : \'black\', \'pointer-events\': tab.disabled ? \'none\' : null}">\n                {{tab.name}}\n            </a>\n        </li>\n    </ul>\n    <ng-transclude-replace></ng-transclude-replace>\n</div>');
 $templateCache.put('src/containers/templates/workflowControls.html','<div class="sr-workflow-controls" ng-transclude></div>\n\n');
 $templateCache.put('src/containers/templates/workflowWarnings.html','<div class="sr-warning-box" ng-style="{\'visibility\': visibility}">\n    {{text}}\n</div>\n');
+$templateCache.put('src/containers/timeline/timeline.content.html','<div ng-controller="TimelineController" class="main-container">\n\n    <tab-container>\n\n        <workflow-tab tab-name="Fetch Data">\n            <concept-box concept-group="conceptBoxes.datapoints"></concept-box>\n            <br>\n            <br>\n            <fetch-button concept-map="conceptBoxes" allowed-cohorts="[1]"></fetch-button>\n        </workflow-tab>\n\n        <workflow-tab tab-name="Run Analysis">\n            <run-button button-name="Create Plot" results-storage="scriptResults" script-to-run="run" parameter-map="params"></run-button>\n            <br>\n            <br>\n            <timeline-plot data="scriptResults" width="1200" height="1200"></timeline-plot>\n        </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
+$templateCache.put('src/containers/timeline/timeline.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
 $templateCache.put('src/containers/volcanoplot/volcanoplot.content.html','<div ng-controller="VolcanoplotController" class="main-container">\n\n    <tab-container>\n\n            <workflow-tab tab-name="Fetch Data" disabled="fetch.disabled">\n                <concept-box style="display: inline-block" concept-group="fetch.conceptBoxes.highDimensional" type="HD" min="1" max="-1" label="High Dimensional Variables" tooltip="Select high dimensional data node(s) from the data tree and drag it into the box.\n                             The nodes needs to be from the same platform.">\n            </concept-box>\n            <br>\n            <br>\n            <fetch-button concept-map="fetch.conceptBoxes" loaded="fetch.loaded" running="fetch.running" allowed-cohorts="[2]">\n            </fetch-button>\n        </workflow-tab>\n\n            <workflow-tab tab-name="Run Analysis" disabled="runAnalysis.disabled">\n                <run-button button-name="Create Plot" store-results-in="runAnalysis.scriptResults" script-to-run="run" arguments-to-use="runAnalysis.params" filename="volcanoplot.json" running="runAnalysis.running">\n                </run-button>\n                <capture-plot-button filename="volcanoplot.svg" target="volcano-plot"></capture-plot-button>\n                <br>\n                <br>\n                <volcano-plot data="runAnalysis.scriptResults" width="1000" height="800"></volcano-plot>\n            </workflow-tab>\n\n    </tab-container>\n\n</div>\n');
-$templateCache.put('src/containers/volcanoplot/volcanoplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');
-$templateCache.put('src/containers/timeline/timeline.content.html','<div ng-controller="TimelineController" class="main-container">\n\n\t\t<tab-container>\n\n\t\t\t<workflow-tab tab-name="Fetch Data">\n\t\t\t\t<concept-box concept-group="conceptBoxes.datapoints"></concept-box>\n\t\t\t\t<br>\n\t\t\t\t<br>\n\t\t\t\t<fetch-button concept-map="conceptBoxes"></fetch-button>\n\t\t\t</workflow-tab>\n\n\t\t\t<workflow-tab tab-name="Run Analysis">\n\t\t\t\t<run-button button-name="Create Plot" results-storage="scriptResults" script-to-run="run" parameter-map="params"></run-button>\n\t\t\t\t<br>\n\t\t\t\t<br>\n\t\t\t\t<timeline-plot data="scriptResults" width="1200" height="1200"></timeline-plot>\n\t\t\t</workflow-tab>\n\n\t\t</tab-container>\n\n</div>\n');
-$templateCache.put('src/containers/timeline/timeline.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');}]);
+$templateCache.put('src/containers/volcanoplot/volcanoplot.html','<div ui-layout="{flow : \'column\'}" class="base-ui-contents">\n    <div ui-layout-container size="20%" min-size="0%">\n        <div ui-view="sidebar"></div>\n    </div>\n\n    <div ui-layout-container min-size="50%">\n        <div ui-view="content"></div>\n    </div>\n</div>\n\n');}]);
 
 'use strict';
 
@@ -175,7 +175,8 @@ angular.module('smartRApp').controller('HeatmapController', [
                 categoric: {concepts: [], valid: true}
             },
             selectedBiomarkers: [],
-            scriptResults: {}
+            scriptResults: {},
+            images: {}
         };
 
         // ------------------------------------------------------------- //
@@ -197,9 +198,6 @@ angular.module('smartRApp').controller('HeatmapController', [
             disabled: true,
             running: false,
             params: {
-                selections: {
-                    selectedRownames: [],
-                },
                 max_row: 100,
                 sorting: 'nodes',
                 ranking: 'coef',
@@ -357,11 +355,12 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
                             // grails response looks like this:
                             // { "id": 1842083, "source": "", "keyword": "TPO", "synonyms":
                             // "(TDH2A, MSA, TPX)", "category": "GENE", "display": "Gene" }
-                            var r = grailsResponse.rows.map(function(v) {
-                                return {
+                            var r = [];
+                            grailsResponse.rows.forEach(function(v) {
+                                r.push({
                                     label: v.keyword,
                                     value: v
-                                }
+                                });
                             });
                             return response(r);
                         }
@@ -421,9 +420,10 @@ angular.module('smartRApp').directive('biomarkerSelection', ['$rootScope','Endpo
                         headers: headers
                     });
 
-                    curXHR.always(function() { curXHR = null; })
+                    curXHR.finally(function() { curXHR = null; });
                     return curXHR.then(
                         function(data) {
+                            data = data.data;
                             data = data.substring(5, data.length - 1);  // loadSearchPathways returns String with null (JSON).
                                                                         // This strips it off
                             response(JSON.parse(data));
@@ -620,37 +620,36 @@ angular.module('smartRApp').directive('conceptBox', [
                     template_tooltip = element[0].querySelector('.sr-tooltip-dialog');
 
                 // instantiate tooltips
-                $(template_tooltip).tooltip({track: true, tooltipClass:"sr-ui-tooltip"});
+                $(template_tooltip).tooltip({track: true, tooltipClass: "sr-ui-tooltip"});
 
-                var _clearWindow = function() {
-                    $(template_box).children().remove();
+                var _clearWindow = function () {
+                    scope.conceptGroup.concepts.length = 0;
+                    // in order to avoid reassignment of a shared variable with watchers
                 };
 
-                var _getConcepts = function() {
-                    return $(template_box).children().toArray().map(function(childNode) {
-                        return childNode.getAttribute('conceptid');
-                    });
-                };
 
-                // Avoid ExtJS lib
-                // =====================================================================
-                //var _activateDragAndDrop = function() {
-                //    var extObj = Ext.get(template_box);
-                //    var dtgI = new Ext.dd.DropTarget(extObj, {ddGroup: 'makeQuery'});
-                //    dtgI.notifyDrop = dropOntoCategorySelection; // jshint ignore:line
-                //};
+                scope.onNodeDropEvent = function (event, info, node) {
+                    scope.conceptGroup.concepts.push(node);
+                    console.log(node);
+                    scope.validate();
+                };
 
                 var typeMap = {
-                    hleaficon: 'HD',
-                    alphaicon: 'LD-categorical',
-                    null: 'LD-categorical', // a fix for older tm version without alphaicon
+                    HIGH_DIMENSIONAL: 'HD',
                     CATEGORICAL_OPTION: 'LD-categorical',
-                    valueicon: 'LD-numerical'
+                    NUMERIC: 'LD-numerical'
                 };
-                var _containsOnlyCorrectType = function() {
-                    return $(template_box).children().toArray().every(function(childNode) {
-                        return typeMap[childNode.getAttribute('setnodetype')] === scope.type;
+
+                var _containsOnlyCorrectType = function () {
+                    if (scope.type === undefined) return true;
+                    var correct = true;
+                    scope.conceptGroup.concepts.forEach(function (conceptObj) {
+                        if (scope.type !== typeMap[conceptObj.type]) {
+                            correct = false;
+                            return ;
+                        }
                     });
+                    return correct;
                 };
 
                 var _getNodeDetails = function (conceptKeys, callback) {
@@ -669,64 +668,59 @@ angular.module('smartRApp').directive('conceptBox', [
 
                     request.then(
                         callback,
-                        function() {
+                        function () {
                             alert('Could not fetch node details. Network connection lost?');
                         });
                 };
 
-                // activate drag & drop for our conceptBox and color it once it is rendered
-                scope.$evalAsync(function() {
-                    //_activateDragAndDrop();
-                });
 
                 // bind the button to its clearing functionality
-                template_btn.addEventListener('click', function() {
+                template_btn.addEventListener('click', function () {
                     _clearWindow();
+                    scope.validate();
                 });
 
                 // this watches the childNodes of the conceptBox and updates the model on change
-                new MutationObserver(function() {
-                    scope.conceptGroup.concepts = _getConcepts(); // update the model
-                    scope.validate();
-                    scope.$apply();
-                }).observe(template_box, { childList: true });
+                /*new MutationObserver(function() {
+                 scope.conceptGroup.concepts = _getConcepts(); // update the model
+                 scope.validate();
+                 scope.$apply();
+                 }).observe(template_box, { childList: true });*/
 
-                scope.validate = function() {
+                scope.validate = function () {
                     scope.instructionMinNodes = scope.conceptGroup.concepts.length < min;
                     scope.instructionMaxNodes = max !== -1 && scope.conceptGroup.concepts.length > max;
                     scope.instructionNodeType = !_containsOnlyCorrectType();
-                    // FIXME: Disabled for now because this causes problems with certain datasets for unknown reasons
-                    // if (scope.type === 'HD' && scope.conceptGroup.concepts.length > 1) {
-                    //     _getNodeDetails(scope.conceptGroup.concepts, function(response) {
-                    //         if (Object.keys(response.data).length < 2) {
-                    //             var platforms = response.data[Object.keys(response.data)[0]].platforms;
-                    //             scope.instructionNodePlatform = !platforms.every(function(el) { 
-                    //                 return el.title === platforms[0].title;
-                    //             });
-                    //         } else {
-                    //             scope.instructionNodePlatform = true;
-                    //         }
-                    //     });
-                    // } else {
-                    //     scope.instructionNodePlatform = false;
-                    // }
-                    scope.instructionNodePlatform = false;
+                    if (scope.type === 'HD' && scope.conceptGroup.concepts.length > 1) {
+                        _getNodeDetails(scope.conceptGroup.concepts, function (response) {
+                            if (Object.keys(response.data).length < 2) {
+                                var platforms = response.data[Object.keys(response.data)[0]].platforms;
+                                scope.instructionNodePlatform = !platforms.every(function (el) {
+                                    return el.title === platforms[0].title;
+                                });
+                            } else {
+                                scope.instructionNodePlatform = true;
+                            }
+                        });
+                    } else {
+                        scope.instructionNodePlatform = false;
+                    }
                 };
 
                 scope.$watchGroup([
-                    'instructionNodeType',
-                    'instructionNodePlatform',
-                    'instructionMaxNodes',
-                    'instructionMinNodes'],
-                    function(newValue) {
+                        'instructionNodeType',
+                        'instructionNodePlatform',
+                        'instructionMaxNodes',
+                        'instructionMinNodes'],
+                    function (newValue) {
                         var instructionNodeType = newValue[0],
                             instructionNodePlatform = newValue[1],
                             instructionMaxNodes = newValue[2],
                             instructionMinNodes = newValue[3];
                         scope.conceptGroup.valid = !(instructionNodeType ||
-                                                     instructionNodePlatform ||
-                                                     instructionMaxNodes ||
-                                                     instructionMinNodes);
+                        instructionNodePlatform ||
+                        instructionMaxNodes ||
+                        instructionMinNodes);
                     });
 
                 scope.validate();
@@ -1128,13 +1122,34 @@ angular.module('smartRApp').directive('sortingCriteria', [
 
 'use strict';
 
-angular.module('smartRApp').directive(['summaryStats',
-    '$rootScope',
-    function($rootScope) {
+angular.module('smartRApp').directive('summaryStats',
+    ['$rootScope', 'rServeService', '$log',
+    function($rootScope, rServeService, $log) {
         return {
             restrict: 'E',
             scope: {
-                summaryData: '='
+                summaryData: '=',
+                images: '='
+            },
+            link: function(scope, elm, attrs) {
+                scope.$watch( function() {
+                    return scope.summaryData;
+                }, function(updated, old) {
+                    if (!_.isEqual(updated, old)) {
+                        _.each(updated.summary, function(sum) {
+                            sum.then( function(p) {
+                                var imgPath = p.img;
+
+                                rServeService.fetchImageResource(imgPath)
+                                    .then( function(res) {
+                                        scope.images[imgPath] = res;
+                                    }, function(e) {
+                                        $log.error("Error while fetching the image for path", imgPath, e);
+                                    });
+                            });
+                        });
+                    }
+                });
             },
             templateUrl:   'src/containers/templates/summaryStatistics.html'
         };
@@ -1842,29 +1857,7 @@ angular.module('smartRApp').factory('smartRUtils', ['$q', 'CohortSharingService'
 
     service.getSubsetIds = function smartRUtil_getSubsetIds() {
         var defer = $q.defer();
-
-        function resolveResult() {
-            var res = window.GLOBAL.CurrentSubsetIDs.slice(1).map(function (v) {
-                return v || null;
-            });
-            if (res.some(function (el) {
-                return el !== null;
-            })) {
-                defer.resolve(res);
-            } else {
-                defer.reject();
-            }
-        }
-
-        for (var i = 1; i <= window.GLOBAL.NumOfSubsets; i++) {
-            if (!window.isSubsetEmpty(i) && !window.GLOBAL.CurrentSubsetIDs[i]) {
-                window.runAllQueries(resolveResult, window.smartRPanel);
-                return defer.promise;
-            }
-        }
-
-        resolveResult();
-
+        defer.resolve(CohortSharingService.getSelection());
         return defer.promise;
     };
 
@@ -2126,10 +2119,10 @@ angular.module('smartRApp').directive('boxplot', [
                 d3.selectAll('.d3-tip').remove();
             }
 
-        function removeOutliers() {
-            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
-            if (currentSelection) { excludeSelection(); }
-        }
+            function removeOutliers() {
+                currentSelection = d3.selectAll('.outlier').map(function (d) { return d.patientID; });
+                if (currentSelection) { excludeSelection(); }
+            }
 
             function kernelDensityEstimator(kernel, x) {
                 return function (sample) {

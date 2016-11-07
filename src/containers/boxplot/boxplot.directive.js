@@ -207,10 +207,10 @@ angular.module('smartRApp').directive('boxplot', [
                 d3.selectAll('.d3-tip').remove();
             }
 
-        function removeOutliers() {
-            currentSelection = d3.selectAll('.outlier').data().map(function (d) { return d.patientID; });
-            if (currentSelection) { excludeSelection(); }
-        }
+            function removeOutliers() {
+                currentSelection = d3.selectAll('.outlier').map(function (d) { return d.patientID; });
+                if (currentSelection) { excludeSelection(); }
+            }
 
             function kernelDensityEstimator(kernel, x) {
                 return function (sample) {
